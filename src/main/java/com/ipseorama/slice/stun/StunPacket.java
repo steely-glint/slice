@@ -8,8 +8,10 @@ package com.ipseorama.slice.stun;
 import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.zip.CRC32;
 import javax.crypto.Mac;
 import javax.crypto.ShortBufferException;
@@ -27,22 +29,22 @@ public class StunPacket {
 
     static int calculateFingerprint(byte[] rawPack) {
         CRC32 crc = new CRC32();
-
         crc.update(rawPack, 0, rawPack.length - FPLEN);
         return (int) (crc.getValue() ^ 0x5354554eL);
     }
 
-    static byte[] calculateMessageIntegrity(byte[] pass, ByteBuffer bb) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
+    static byte[] calculateMessageIntegrity(byte[] pass, ByteBuffer bb, boolean hasfp) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
         // set the key into an HmacSHA1
+        int fplen = hasfp ? FPLEN : 0;
         SecretKeySpec key = new SecretKeySpec(pass, "HmacSHA1");
         Mac m = Mac.getInstance("HmacSHA1");
-        int tail = MILENGTH + FPLEN;
+        int tail = MILENGTH + fplen;
         m.init(key);
         // need to fake the length since we calculate the MI as if there is no FP
         char olen = bb.getChar(2);
         byte[] lenb = new byte[2];
         ByteBuffer bbfake = ByteBuffer.wrap(lenb);
-        bbfake.putChar(0, (char) (olen - FPLEN));
+        bbfake.putChar(0, (char) (olen - fplen));
 
         byte[] mainframe = bb.array();
 
@@ -57,7 +59,7 @@ public class StunPacket {
     }
 
     ArrayList<StunAttribute> _attributes;
-    int _fingerprint;
+    Integer _fingerprint;
     byte[] _messageIntegrity;
     short _mtype;
 
@@ -97,14 +99,57 @@ public class StunPacket {
         return buf;
     }
 
-    StunPacket(short mtype, int fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
+    StunPacket(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
         _attributes = attributes;
         _fingerprint = fingerprint;
         _messageIntegrity = messageIntegrity;
         _mtype = mtype;
     }
 
-    static StunPacket mkStunPacket(byte[] inbound, String miPass) throws Exception {
+    static byte[] findPass(ArrayList<StunAttribute> attributes, Map<String, String> miPass) throws NoSuchAlgorithmException {
+        byte[] ret = null;
+        String pass = null;
+        String realm = null;
+        String username = null;
+        for (StunAttribute a : attributes) {
+            if (a.getName().equals("USERNAME")) {
+                username = a.getString();
+            }
+            if (a.getName().equals("REALM")) {
+                realm = a.getString();
+            }
+        }
+        if (username != null) {
+            String suser = username.split(":")[0];
+            pass = miPass.get(suser);
+            if ((realm != null) && (pass != null)) {
+                pass = suser + ":" + realm + ":" + pass; // should do SASLPrep
+            }
+            Log.debug("User =" + username + " pass =" + pass);
+        }
+        if (pass != null) {
+            ret = pass.getBytes();
+            if (realm != null) {
+                MessageDigest md5;
+                md5 = MessageDigest.getInstance("MD5");
+                ret = md5.digest(ret);
+            }
+        }
+        return ret;
+    }
+
+    static boolean hasAttribute(ArrayList<StunAttribute> attributes, String aname) {
+        boolean ret = false;
+        for (StunAttribute a : attributes) {
+            if (a.getName().equals(aname)) {
+                ret = true;
+                break;
+            }
+        }
+        return ret;
+    }
+
+    static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass) throws Exception {
         StunPacket ret = null;
         if (inbound.length >= 20) {
             ByteBuffer b_frame = ByteBuffer.wrap(inbound);
@@ -122,10 +167,14 @@ public class StunPacket {
                     if (mlen <= inbound.length - 20) {
                         ByteBuffer tit = b_frame.slice();
                         ArrayList<StunAttribute> attributes = parseAttributes(tit);
-                        int fingerprint = calculateFingerprint(inbound);
+                        byte[] pass = findPass(attributes, miPass);
+                        Integer fingerprint = null;
+                        if (hasAttribute(attributes, "FINGERPRINT")) {
+                            fingerprint = new Integer(calculateFingerprint(inbound));
+                        }
                         byte[] messageIntegrity = null;
                         if (miPass != null) {
-                            messageIntegrity = calculateMessageIntegrity(miPass.getBytes(), b_frame);
+                            messageIntegrity = calculateMessageIntegrity(pass, b_frame, fingerprint != null);
                         }
                         validatePacket(attributes, fingerprint, messageIntegrity);
                         switch (mtype) {
@@ -137,6 +186,9 @@ public class StunPacket {
                                 break;
                             case 0x0001:
                                 ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity);
+                                break;
+                            default:
+                                ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity);
                                 break;
                         }
                     } else {
@@ -155,7 +207,7 @@ public class StunPacket {
         return ret;
     }
 
-    private static void validatePacket(ArrayList<StunAttribute> attributes, int fingerprint, byte[] messageIntegrity) throws FingerPrintException, MessageIntegrityException {
+    private static void validatePacket(ArrayList<StunAttribute> attributes, Integer fingerprint, byte[] messageIntegrity) throws FingerPrintException, MessageIntegrityException {
         boolean fpOk = false;
         boolean miOk = false;
 
@@ -166,7 +218,7 @@ public class StunPacket {
                 Log.debug("Checking stun fingerprint");
                 fpOk = (a.getInt() == fingerprint);
             }
-            if (name.equals("MESSAGE-INTEGRITY")) {
+            if (name.equals("MESSAGE-INTEGRITY") && (messageIntegrity != null) ){
                 Log.debug("Checking mi");
                 byte mi[] = a.getBytes();
                 if (mi.length == messageIntegrity.length) {
@@ -183,7 +235,7 @@ public class StunPacket {
                 Log.debug("username is: " + a.getString());
             }
         }
-        if (!fpOk && !attributes.isEmpty()) {
+        if (!fpOk && fingerprint != null) {
             throw new FingerPrintException();
         }
         if (!miOk && messageIntegrity != null) { // ie we were expecting a message integrity check 
@@ -203,7 +255,7 @@ public class StunPacket {
         }
     }
 
-    private static class StunPacketException extends Exception {
+    static class StunPacketException extends Exception {
 
         public StunPacketException(String message) {
             super(message);
@@ -214,21 +266,21 @@ public class StunPacket {
 
 class StunErrorResponse extends StunPacket {
 
-    public StunErrorResponse(short mtype, int fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
+    public StunErrorResponse(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
         super(mtype, fingerprint, attributes, messageIntegrity);
     }
 }
 
 class StunBindingRequest extends StunPacket {
 
-    public StunBindingRequest(short mtype, int fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
+    public StunBindingRequest(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
         super(mtype, fingerprint, attributes, messageIntegrity);
     }
 }
 
 class StunBindingResponse extends StunPacket {
 
-    public StunBindingResponse(short mtype, int fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
+    public StunBindingResponse(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
         super(mtype, fingerprint, attributes, messageIntegrity);
     }
 }

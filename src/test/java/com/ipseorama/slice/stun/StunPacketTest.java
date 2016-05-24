@@ -30,6 +30,7 @@ public class StunPacketTest {
     @BeforeClass
     public static void setUpClass() {
         Log.setLevel(Log.ALL);
+
     }
 
     @AfterClass
@@ -41,7 +42,12 @@ public class StunPacketTest {
                     new SimpleEntry<>("o3rvX/IW811zoMmQ", "N3Wk6Gk45aUN3w9z3zql1ZqI"),
                     new SimpleEntry<>("6hg", "4vc3fb0dshp2lhs6ekne716q0v"),
                     new SimpleEntry<>("86u301ajf8mdpd", "1ir94ur2424gp08ta9eud4vtj1"),
-                    new SimpleEntry<>("LCIKuKTYRRaEp9hM", "ZuGwoWLM3IzMKlC6O6TJI9cg")
+                    new SimpleEntry<>("LCIKuKTYRRaEp9hM", "ZuGwoWLM3IzMKlC6O6TJI9cg"),
+                    new SimpleEntry<>("pet", "snoopy"),
+                    new SimpleEntry<>("owner", "charliebrown"),
+                    new SimpleEntry<>("device", "bone"),
+                    new SimpleEntry<>("smartphone", "nexus5x"),
+                    new SimpleEntry<>("a88ag", "incorrect")
             ).collect(Collectors.toMap((e) -> e.getKey(), (e) -> e.getValue())));
 
     byte[] emptyBindingRequest = {
@@ -168,24 +174,61 @@ public class StunPacketTest {
         StunPacket s = StunPacket.mkStunPacket(emptyBindingRequest, null);
         assert (s instanceof StunBindingRequest);
     }
-    
-        @Test
+
+    @Test
     public void stunResponse() throws Exception {
         StunPacket s = StunPacket.mkStunPacket(pureStunResponse, null);
         assert (s instanceof StunBindingResponse);
     }
 
-        @Test
+    @Test
+    public void testTurnReq() throws Exception {
+        StunPacket s = StunPacket.mkStunPacket(this.turnRequest, null);
+        assert (s instanceof StunPacket);
+    }
+
+    @Test
+    public void testTurnChallenge() throws Exception {
+        StunPacket s = StunPacket.mkStunPacket(this.turnResponseChallenge, null);
+        assert (s instanceof StunPacket);
+    }
+
+    @Test
+    public void testTurnReqRedux() throws Exception {
+        StunPacket s = StunPacket.mkStunPacket(this.turnReqRedux, passwords);
+        assert (s instanceof StunPacket);
+    }
+
+    @Test
+    public void testTurnReqOk() throws Exception {
+        StunPacket s = StunPacket.mkStunPacket(this.turnReqOk, null);
+        assert (s instanceof StunPacket);
+    }
+
+    @Test
+    public void testTurnPerm() throws Exception {
+        StunPacket s = StunPacket.mkStunPacket(this.turnReqPerm, passwords);
+        assert (s instanceof StunPacket);
+    }
+
+    @Test
+    public void testTurnAllocOk() throws Exception {
+        StunPacket s = StunPacket.mkStunPacket(this.turnAllocOk, null);
+        assert (s instanceof StunPacket);
+    }
+
+    @Test
     public void testPacket() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(stunBindingRequest, "4vc3fb0dshp2lhs6ekne716q0v");
+        StunPacket s = StunPacket.mkStunPacket(stunBindingRequest, passwords);
         assert (s instanceof StunBindingRequest);
     }
+
     @Test
     public void testMI() {
         Exception rez = new java.lang.Exception();
 
         try {
-            StunPacket s = StunPacket.mkStunPacket(stunBindingResponse, "wrong pass");
+            StunPacket s = StunPacket.mkStunPacket(stunBindingResponse, passwords);
         } catch (Exception x) {
             rez = x;
         }
