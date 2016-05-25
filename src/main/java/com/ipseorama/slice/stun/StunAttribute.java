@@ -93,23 +93,43 @@ public class StunAttribute {
         return __nameMap.get(name);
     }
     private final Integer aType;
-    private final int aLen;
-    private final ByteBuffer aVal;
+    private int aLen;
+    private ByteBuffer aVal;
+    private boolean _xor;
 
     String getName() {
         return findName(aType);
     }
 
+    void setString(String s) {
+        aVal = ByteBuffer.wrap(s.getBytes());
+        aLen = s.length();
+    }
+
     String getString() {
-        return new String(aVal.array());
+        byte b[] = new byte[aLen];
+        aVal.get(b, 0, aLen);
+        return new String(b);
     }
 
     int getInt() {
         return aVal.getInt(0);
     }
 
+    void setInt(int n) {
+        aLen = 4;
+        aVal = ByteBuffer.allocate(aLen);
+        aVal.putInt(n);
+    }
+
     long getLong() {
         return aVal.getLong(0);
+    }
+
+    void setLong(long n) {
+        aLen = 8;
+        aVal = ByteBuffer.allocate(aLen);
+        aVal.putLong(n);
     }
 
     class ErrorAttribute {
@@ -122,6 +142,13 @@ public class StunAttribute {
             reason = r;
         }
     };
+
+    void setError(ErrorAttribute ea) {
+        aLen = 4 + ea.reason.length();
+        aVal = ByteBuffer.allocate(aLen);
+        aVal.putInt(ea.code);
+        aVal.put(ea.reason.getBytes());
+    }
 
     ErrorAttribute getError() {
         short code = aVal.getShort(2);
@@ -136,21 +163,53 @@ public class StunAttribute {
     // always use indexes.
     InetSocketAddress getIpAddress() throws UnknownHostException {
         byte iptype = aVal.get(1);
-        char port = aVal.getChar(2);
+        int port = (0xffff) & aVal.getChar(2);
         byte[] addressBytes = (iptype == 1) ? new byte[4] : new byte[16];
-        aVal.get(addressBytes, 4, addressBytes.length);
+        for (int i = 0; i < addressBytes.length; i++) {
+            addressBytes[i] = aVal.get(4 + i);
+        }
         InetAddress inetAd = java.net.InetAddress.getByAddress(addressBytes);
         return new InetSocketAddress(inetAd, port);
+    }
+
+    void setIpAddress(InetSocketAddress addr) {
+        InetAddress ipa = addr.getAddress();
+        byte code = 1;
+        int len = 4;
+        if (ipa instanceof java.net.Inet6Address) {
+            code = 2;
+            len += 12;
+        }
+        aLen = 4 + len;
+        aVal = ByteBuffer.allocate(aLen);
+        aVal.put((byte) 0);
+        aVal.put(code);
+        aVal.putShort((short) addr.getPort());
+        byte [] iad = ipa.getAddress();
+        aVal.put(iad);
+    }
+
+    void setXorIpAddress(InetSocketAddress addr) {
+        setIpAddress(addr);
+        _xor = true;
     }
 
     short[] getShorts() {
         short[] ret = new short[aLen / 2];
         int i = 0;
         while (i < aLen) {
-            ret[i] = aVal.getShort(i);
+            ret[i>>1] = aVal.getShort(i);
             i += 2;
         }
         return ret;
+    }
+
+    void setShorts(short[] v) {
+        aLen = v.length * 2;
+        aVal = ByteBuffer.allocate(aLen);
+        for (short s : v) {
+            aVal.putShort(s);
+        }
     }
 
     byte[] getBytes() {
@@ -162,10 +221,64 @@ public class StunAttribute {
         }
         return ret;
     }
+    void setBytes(byte [] v){
+        aLen = v.length;
+        aVal = ByteBuffer.allocate(aLen);
+        aVal.put(v);
+    }
 
+    /**
+     * inbound constructor
+     *
+     * @param t
+     * @param l
+     * @param v
+     */
     StunAttribute(Integer t, int l, ByteBuffer v) {
         aType = t;
         aLen = l;
         aVal = v;
+    }
+
+    /**
+     * outbound constructor
+     *
+     * @param t
+     */
+    StunAttribute(String t) {
+        aType = findType(t);
+    }
+
+    /**
+     *
+     * @param out ByteBuffer for whole packet. Correct operation of xor requires
+     * that it starts at the packet head.
+     * @return number of bytes added (inc padding)
+     */
+    int put(ByteBuffer out) {
+        int len;
+        out.putChar((char) ((0xffff) & this.aType));
+        out.putShort((short) aLen);
+        if (_xor && aVal != null) {
+            out.put(aVal.get(0));
+            out.put(aVal.get(1));
+            out.put((byte) (aVal.get(2) ^ out.get(4)));
+            out.put((byte) (aVal.get(3) ^ out.get(5)));
+            for (int i = 4; i < aLen; i++) {
+                byte xv = (byte) (aVal.get(i) ^ out.get(4 + i));
+                out.put(xv);
+            }
+        } else {
+            for (int i = 0; i < aLen; i++) {
+                out.put(aVal.get(i));
+            }
+        }
+        // and add any padding too.
+        len = aLen;
+        int remain = (len % 4) == 0 ? 0 : 4 - (len % 4);
+        for (int i = 0; i < remain; i++) {
+            out.put((byte) 0);
+        }
+        return 4 + len + remain;
     }
 }

@@ -98,6 +98,29 @@ public class StunPacket {
         }
         return buf;
     }
+    
+    static int putAttributes(ByteBuffer bb, ArrayList<StunAttribute>attributes,byte[] pass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException{
+        int len =0;
+        for (StunAttribute a:attributes){
+            len += a.put(bb);
+            bb.putChar(2,(char)len); // update the length            
+            if (a.getName().equals("MESSAGE-INTEGRITY")){
+                byte [] mi = calculateMessageIntegrity(pass,bb,false);
+                for (int i=bb.position()-mi.length;i < bb.position();i++){
+                    bb.put(i,mi[i]);
+                }
+            }
+            if (a.getName().equals("FINGERPRINT")){
+                byte [] rawpack = new byte[bb.position()];
+                for(int i=0;i<rawpack.length;i++){
+                    rawpack[i] = bb.get(i);
+                }
+                int fp = calculateFingerprint(rawpack);
+                bb.putInt(bb.position()-4,fp);
+            }
+        }
+        return len;
+    }
 
     StunPacket(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
         _attributes = attributes;
