@@ -108,7 +108,9 @@ public class StunAttribute {
 
     String getString() {
         byte b[] = new byte[aLen];
-        aVal.get(b, 0, aLen);
+        for (int i = 0; i < aLen; i++) {
+            b[i] = aVal.get(i);
+        }
         return new String(b);
     }
 
@@ -185,7 +187,7 @@ public class StunAttribute {
         aVal.put((byte) 0);
         aVal.put(code);
         aVal.putShort((short) addr.getPort());
-        byte [] iad = ipa.getAddress();
+        byte[] iad = ipa.getAddress();
         aVal.put(iad);
     }
 
@@ -198,7 +200,7 @@ public class StunAttribute {
         short[] ret = new short[aLen / 2];
         int i = 0;
         while (i < aLen) {
-            ret[i>>1] = aVal.getShort(i);
+            ret[i >> 1] = aVal.getShort(i);
             i += 2;
         }
         return ret;
@@ -221,7 +223,8 @@ public class StunAttribute {
         }
         return ret;
     }
-    void setBytes(byte [] v){
+
+    void setBytes(byte[] v) {
         aLen = v.length;
         aVal = ByteBuffer.allocate(aLen);
         aVal.put(v);
