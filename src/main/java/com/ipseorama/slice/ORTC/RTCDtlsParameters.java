@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.ORTC.enums.RTCDtlsRole;
 import java.util.List;
 
 /**

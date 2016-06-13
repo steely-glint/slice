@@ -5,6 +5,10 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.ORTC.enums.RTCIceTcpCandidateType;
+import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
+import com.ipseorama.slice.ORTC.enums.RTCIceCandidateType;
+
 /**
  *
  * @author tim

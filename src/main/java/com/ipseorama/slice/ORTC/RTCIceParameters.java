@@ -15,7 +15,7 @@ public class RTCIceParameters {
     final String password;
     final boolean iceLite;
 
-    RTCIceParameters(String uF, String pass, boolean lite) {
+    public RTCIceParameters(String uF, String pass, boolean lite) {
         usernameFragment = uF;
         password = pass;
         iceLite = lite;

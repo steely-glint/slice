@@ -3,13 +3,13 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.ipseorama.slice.ORTC;
+package com.ipseorama.slice.ORTC.enums;
 
 /**
  *
  * @author tim
  */
-enum RTCIceGatherPolicy {
+public enum RTCIceGatherPolicy {
     ALL() {
         @Override
         public String toString() {
@@ -28,7 +28,7 @@ enum RTCIceGatherPolicy {
             return "relay";
         }
     };
-    static RTCIceGatherPolicy fromString(String policy){
+    public static RTCIceGatherPolicy fromString(String policy){
         RTCIceGatherPolicy ret = null;
         String p = policy.toLowerCase();
         switch(p){

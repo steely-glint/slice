@@ -3,13 +3,13 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.ipseorama.slice.ORTC;
+package com.ipseorama.slice.ORTC.enums;
 
 /**
  *
  * @author tim
  */
-enum RTCIceCredentialType {
+public enum RTCIceCredentialType {
     PASSWORD() {
         @Override
         public String toString() {
@@ -23,7 +23,7 @@ enum RTCIceCredentialType {
         }
     };
 
-    static RTCIceCredentialType fromString(String ty) {
+    public static RTCIceCredentialType fromString(String ty) {
         RTCIceCredentialType ret = null;
         String t = ty.toLowerCase();
         switch (t) {

@@ -5,6 +5,8 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
+import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import java.beans.EventHandler;
 import java.util.List;
 

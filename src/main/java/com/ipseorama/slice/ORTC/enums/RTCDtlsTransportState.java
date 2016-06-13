@@ -3,29 +3,29 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.ipseorama.slice.ORTC;
+package com.ipseorama.slice.ORTC.enums;
 
 /**
  *
  * @author tim
  */
-enum RTCIceGathererState {
+public enum RTCDtlsTransportState {
     NEW() {
         @Override
         public String toString() {
             return "new";
         }
     },
-    GATHERING() {
+    CONNECTING() {
         @Override
         public String toString() {
-            return "gathering";
+            return "connecting";
         }
     },
-    COMPLETE() {
+    CONNECTED() {
         @Override
         public String toString() {
-            return "complete";
+            return "connected";
         }
     },
     CLOSED() {
@@ -33,5 +33,11 @@ enum RTCIceGathererState {
         public String toString() {
             return "closed";
         }
-    };
-}
+    },
+    FAILED() {
+        @Override
+        public String toString() {
+            return "failed";
+        }
+    }
+};

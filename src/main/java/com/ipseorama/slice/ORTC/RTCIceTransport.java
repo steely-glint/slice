@@ -5,6 +5,9 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
+import com.ipseorama.slice.ORTC.enums.RTCIceRole;
+import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import java.beans.EventHandler;
 import java.util.List;
 
@@ -19,25 +22,25 @@ public class RTCIceTransport {
     final RTCIceComponent component;
     protected RTCIceTransportState state;
 
-    RTCIceTransportState getRTCIceTransportState() {
+    public RTCIceTransportState getRTCIceTransportState() {
         return state;
     }
 
-    List<RTCIceCandidate> getRemoteCandidates() {
+    public List<RTCIceCandidate> getRemoteCandidates() {
         return null;
     }
 
-    RTCIceCandidatePair getSelectedCandidatePair() {
+    public RTCIceCandidatePair getSelectedCandidatePair() {
         return null;
     }
 
-    void start(RTCIceGatherer gatherer, RTCIceParameters remoteParameters, RTCIceRole role) {
+    public void start(RTCIceGatherer gatherer, RTCIceParameters remoteParameters, RTCIceRole role) {
     }
 
-    void stop() {
+    public void stop() {
     }
 
-    RTCIceParameters getRemoteParameters() {
+    public RTCIceParameters getRemoteParameters() {
         return null;
     }
 
@@ -45,10 +48,10 @@ public class RTCIceTransport {
         return null; // don't do this - rtcp-mux is good.
     }
 
-    void addRemoteCandidate(RTCIceGatherCandidate remoteCandidate) {
+    public void addRemoteCandidate(RTCIceGatherCandidate remoteCandidate) {
     }
 
-    void setRemoteCandidates(List<RTCIceCandidate> remoteCandidates) {
+    public void setRemoteCandidates(List<RTCIceCandidate> remoteCandidates) {
     }
 
     EventHandler onstatechange;

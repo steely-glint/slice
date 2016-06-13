@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.ORTC.enums.RTCIceCredentialType;
 import java.net.URI;
 import java.util.List;
 
