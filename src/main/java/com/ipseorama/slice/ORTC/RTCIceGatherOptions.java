@@ -16,6 +16,17 @@ class RTCIceGatherOptions {
 
     private RTCIceGatherPolicy gatherPolicy;
     private List<RTCIceServer> iceServers;
+    final private int _portMax;
+    final private int _portMin; // avoid priv ports;
+
+    RTCIceGatherOptions() {
+        this(1024, Character.MAX_VALUE);
+    }
+
+    RTCIceGatherOptions(int portMin, int portMax) {
+        _portMax = portMax;
+        _portMin = portMin;
+    }
 
     /**
      * @return the gatherPolicy
@@ -44,4 +55,19 @@ class RTCIceGatherOptions {
     public void setIceServers(List<RTCIceServer> iceServers) {
         this.iceServers = iceServers;
     }
+
+    /**
+     * @return the _portMax
+     */
+    public int getPortMax() {
+        return _portMax;
+    }
+
+    /**
+     * @return the _portMin
+     */
+    public int getPortMin() {
+        return _portMin;
+    }
+    
 }

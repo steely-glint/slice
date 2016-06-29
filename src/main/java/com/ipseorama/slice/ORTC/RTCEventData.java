@@ -5,12 +5,10 @@
  */
 package com.ipseorama.slice.ORTC;
 
-
-
 /**
  *
- * @author tim
+ * @author thp
  */
-interface  RTCIceGatherCandidate {
-    // tag interface
+public interface RTCEventData {
+    
 }

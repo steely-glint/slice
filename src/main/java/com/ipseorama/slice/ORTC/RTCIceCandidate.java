@@ -8,12 +8,13 @@ package com.ipseorama.slice.ORTC;
 import com.ipseorama.slice.ORTC.enums.RTCIceTcpCandidateType;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidateType;
+import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 
 /**
  *
  * @author tim
  */
-class RTCIceCandidate {
+public class RTCIceCandidate implements RTCIceGatherCandidate,RTCEventData{
 
     private String foundation;
     private Long priority;
@@ -24,6 +25,27 @@ class RTCIceCandidate {
     private RTCIceTcpCandidateType tcpType;
     private String relatedAddress;
     private char relatedPort;
+    private int generation;
+
+
+    /*String              relatedAddress;
+             char         relatedPort;*/
+    RTCIceCandidate(String foundation,
+            long priority,
+            String ip,
+            RTCIceProtocol protocol,
+            char port,
+            RTCIceCandidateType type,
+            RTCIceTcpCandidateType tcpType) {
+        this.foundation = foundation;
+        this.priority = priority;
+        this.ip = ip;
+        this.protocol = protocol;
+        this.port = port;
+        this.type = type;
+        this.tcpType = tcpType;
+        this.generation = 0;
+    }
 
     /**
      * @return the foundation
@@ -42,14 +64,14 @@ class RTCIceCandidate {
     /**
      * @return the priority
      */
-    public Long getPriority() {
+    public long getPriority() {
         return priority;
     }
 
     /**
      * @param priority the priority to set
      */
-    public void setPriority(Long priority) {
+    public void setPriority(long priority) {
         this.priority = priority;
     }
 
@@ -149,5 +171,28 @@ class RTCIceCandidate {
      */
     public void setRelatedPort(char relatedPort) {
         this.relatedPort = relatedPort;
+    }
+
+    String toSDP(RTCIceComponent component) {
+        int cno = (component == component.RTP )? 1:2;
+        StringBuffer ret = new StringBuffer("candidate:");
+        ret.append(this.foundation).append(" ");
+        ret.append(cno).append(" ");
+        ret.append(protocol).append(" ");
+        ret.append(priority).append(" ");
+        ret.append(ip).append(" ");
+        ret.append((int)port).append(" ");
+        ret.append("typ ").append(type).append(" ");
+        ret.append("generation ").append(generation).append(" ");
+        if (this.relatedAddress != null){
+            ret.append("raddr ").append(relatedAddress).append(" ");
+            ret.append("rport ").append(relatedPort).append(" ");
+            // raddr 192.67.4.33 rport 60003
+        }
+        // candidate:1365833797 1 udp 2113939711 2a01:348:339::57a:65d1:a0b4:a83 51309 typ host generation 0
+        return ret.toString().trim();
+    }
+    public String toString(){
+        return this.toSDP(RTCIceComponent.RTP);
     }
 }

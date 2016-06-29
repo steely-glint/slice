@@ -5,12 +5,13 @@
  */
 package com.ipseorama.slice.ORTC;
 
-
+import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
 
 /**
  *
- * @author tim
+ * @author thp
  */
-interface  RTCIceGatherCandidate {
-    // tag interface
+@FunctionalInterface
+public interface EventHandler {
+    public void onEvent(RTCEventData data);
 }
