@@ -23,6 +23,7 @@ import javax.crypto.spec.SecretKeySpec;
  */
 public class StunPacket {
 
+    static int MTU = 1400;
     static int MILENGTH = 24;
     static int FPLEN = 8;
     static long STUNCOOKIE = 0x2112A442;
@@ -46,11 +47,12 @@ public class StunPacket {
         ByteBuffer bbfake = ByteBuffer.wrap(lenb);
         bbfake.putChar(0, (char) (olen - fplen));
 
-        byte[] mainframe = bb.array();
+        byte[] mainframe = bb.array(); // for an outbound packet this will be MTU long we need to ignore the rest
 
         m.update(mainframe, 0, 2); // first 2 bytes
         m.update(lenb, 0, 2); // tricked up length
-        m.update(mainframe, 4, mainframe.length - (tail + 4)); // everything else before the MI
+        m.update(mainframe, 4, (20 + olen - tail - 4)); // everything else before the MI
+
         //and extract the goodies
         byte[] mi = new byte[20];
         m.doFinal(mi, 0);
@@ -62,6 +64,8 @@ public class StunPacket {
     Integer _fingerprint;
     byte[] _messageIntegrity;
     short _mtype;
+    byte[] _tid;
+    byte[] _pass;
 
     /*
 0                   1                   2                   3
@@ -76,17 +80,39 @@ public class StunPacket {
 |                                                               |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
+    public byte[] outboundBytes(byte[] pass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
+        byte[] ret = null;
+        ByteBuffer bb = ByteBuffer.allocate(MTU);
+        bb.putChar((char) (0x3fff & this._mtype));
+        bb.putChar((char) 0); // fix the length later....
+        bb.putInt((int) STUNCOOKIE);
+        bb.put(this._tid);
+        int len = 20;
+        if (_attributes != null) {
+            len += putAttributes(bb, _attributes, pass);
+        }
+        ret = new byte[len];
+        for (int i = 0; i < len; i++) {
+            ret[i] = bb.get(i);
+        }
+        Log.debug("returning packet length " + len);
+        return ret;
+    }
+
     static ArrayList<StunAttribute> parseAttributes(ByteBuffer a_frame) {
         ArrayList<StunAttribute> buf = new ArrayList();
         while (a_frame.remaining() >= 4) {
+            int startpos = a_frame.position() + 20;
             char a_type = a_frame.getChar();
             int a_len = a_frame.getChar();
             byte[] val = new byte[a_len];
-            a_frame.get(val);
+            if (val.length > 0) {
+                a_frame.get(val);
+            }
             ByteBuffer vbb = ByteBuffer.wrap(val);
             StunAttribute a = new StunAttribute(new Integer(a_type), a_len, vbb);
             buf.add(a);
-            Log.debug("Attribute type " + a.getName() + "(" + a_type + ") " + " len " + a_len + " at " + a_frame.position());
+            Log.debug("Attribute type " + a.getName() + "(" + a_type + ") " + " len " + a_len + " at " + startpos);
             // now suckup any pad 
             int pad = a_len % 4;
             if (pad != 0) {
@@ -98,34 +124,46 @@ public class StunPacket {
         }
         return buf;
     }
-    
-    static int putAttributes(ByteBuffer bb, ArrayList<StunAttribute>attributes,byte[] pass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException{
-        int len =0;
-        for (StunAttribute a:attributes){
+
+    static int putAttributes(ByteBuffer bb, ArrayList<StunAttribute> attributes, byte[] pass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
+        int len = 0;
+        for (StunAttribute a : attributes) {
+            Log.debug("putting attribute " + a.getName() + " at " + bb.position());
             len += a.put(bb);
-            bb.putChar(2,(char)len); // update the length            
-            if (a.getName().equals("MESSAGE-INTEGRITY")){
-                byte [] mi = calculateMessageIntegrity(pass,bb,false);
-                for (int i=bb.position()-mi.length;i < bb.position();i++){
-                    bb.put(i,mi[i]);
+            bb.putChar(2, (char) len); // update the length            
+            if (a.getName().equals("MESSAGE-INTEGRITY")) {
+                byte[] mi = calculateMessageIntegrity(pass, bb, false);
+                int start = bb.position() - mi.length;
+                for (int i = start; i < bb.position(); i++) {
+                    bb.put(i, mi[i - start]);
                 }
             }
-            if (a.getName().equals("FINGERPRINT")){
-                byte [] rawpack = new byte[bb.position()];
-                for(int i=0;i<rawpack.length;i++){
+            if (a.getName().equals("FINGERPRINT")) {
+                byte[] rawpack = new byte[bb.position()];
+                for (int i = 0; i < rawpack.length; i++) {
                     rawpack[i] = bb.get(i);
                 }
                 int fp = calculateFingerprint(rawpack);
-                bb.putInt(bb.position()-4,fp);
+                bb.putInt(bb.position() - 4, fp);
             }
         }
         return len;
     }
 
+    /**
+     * inbound constuctor
+     */
     StunPacket(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
+        this(mtype);
         _attributes = attributes;
         _fingerprint = fingerprint;
         _messageIntegrity = messageIntegrity;
+    }
+
+    /**
+     * Outbound
+     */
+    StunPacket(short mtype) {
         _mtype = mtype;
     }
 
@@ -172,6 +210,10 @@ public class StunPacket {
         return ret;
     }
 
+    /*
+    The idea of these static methods is basically paranoia - no stunpacket object is created untill
+    the packet has passed validation checks. It also ensures we can create the correct type.
+     */
     static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass) throws Exception {
         StunPacket ret = null;
         if (inbound.length >= 20) {
@@ -214,6 +256,10 @@ public class StunPacket {
                                 ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity);
                                 break;
                         }
+                        if (ret != null) {
+                            ret.setTid(tid);
+                            ret.setPass(pass);
+                        }
                     } else {
                         throw new StunPacketException("implausible length param " + mlen + " not less than " + (inbound.length - 20));
                     }
@@ -241,7 +287,7 @@ public class StunPacket {
                 Log.debug("Checking stun fingerprint");
                 fpOk = (a.getInt() == fingerprint);
             }
-            if (name.equals("MESSAGE-INTEGRITY") && (messageIntegrity != null) ){
+            if (name.equals("MESSAGE-INTEGRITY") && (messageIntegrity != null)) {
                 Log.debug("Checking mi");
                 byte mi[] = a.getBytes();
                 if (mi.length == messageIntegrity.length) {
@@ -265,6 +311,27 @@ public class StunPacket {
             throw new MessageIntegrityException();
         }
     }
+
+    void setTid(byte[] tid) {
+        _tid = tid;
+    }
+
+    public byte[] getTid() {
+        return _tid;
+    }
+
+    byte[] getPass() {
+        return _pass;
+    }
+
+    private void setPass(byte[] pass) {
+        _pass = pass;
+    }
+
+    void setAttributes(ArrayList<StunAttribute> attrs) {
+        _attributes = attrs;
+    }
+
 
     static class FingerPrintException extends Exception {
 
@@ -292,6 +359,10 @@ class StunErrorResponse extends StunPacket {
     public StunErrorResponse(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
         super(mtype, fingerprint, attributes, messageIntegrity);
     }
+
+    public StunErrorResponse() {
+        super((short) 0x0110);
+    }
 }
 
 class StunBindingRequest extends StunPacket {
@@ -299,11 +370,19 @@ class StunBindingRequest extends StunPacket {
     public StunBindingRequest(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
         super(mtype, fingerprint, attributes, messageIntegrity);
     }
+
+    public StunBindingRequest() {
+        super((short) 0x0001);
+    }
 }
 
 class StunBindingResponse extends StunPacket {
 
     public StunBindingResponse(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
         super(mtype, fingerprint, attributes, messageIntegrity);
+    }
+
+    public StunBindingResponse() {
+        super((short) 0x0101);
     }
 }

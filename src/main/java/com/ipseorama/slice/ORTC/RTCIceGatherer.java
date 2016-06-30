@@ -8,6 +8,7 @@ package com.ipseorama.slice.ORTC;
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidateType;
 import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
+import com.ipseorama.slice.ORTC.enums.RTCIceGatherPolicy;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.ORTC.enums.RTCIceTcpCandidateType;
 import com.phono.srtplight.Log;
@@ -17,10 +18,13 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.URI;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  *
@@ -172,8 +176,22 @@ For incoming connectivity checks that pass validation,
          */
         setState(RTCIceGathererState.GATHERING);
         _sock = allocateUdpSocket(options.getPortMin(), options.getPortMax());
-        gatherLocals();
-
+        RTCIceGatherPolicy policy = options.getGatherPolicy();
+        List<RTCIceServer> servers = options.getIceServers();
+        switch (policy) {
+            case NOHOST:
+                gatherReflex(servers);
+                gatherRelay(servers);
+                break;
+            case ALL:
+                gatherLocals();
+                gatherReflex(servers);
+                gatherRelay(servers);
+                break;
+            case RELAY:
+                gatherRelay(servers);
+                break;
+        }
     }
 
     public RTCIceParameters getLocalParameters() {
@@ -210,11 +228,10 @@ For incoming connectivity checks that pass validation,
      */
     private void setState(RTCIceGathererState _state) {
         this._state = _state;
-        if (this.onstatechange != null){
+        if (this.onstatechange != null) {
             onstatechange.onEvent(_state);
         }
     }
-
 
     private int howMacBased(byte[] address, byte[] hw) {
         // check the last 3 bytes of the address against the hardware address
@@ -250,5 +267,35 @@ For incoming connectivity checks that pass validation,
             }
         }
         return ret;
+    }
+
+    private void gatherReflex(List<RTCIceServer> servers) {
+
+        servers.stream().forEach(
+                (RTCIceServer s) -> {
+                    Stream<String> stuns = s.urls.stream().map(
+                            (URI u) -> {
+                                String stun = "stun:";
+                                String us = u.toASCIIString();
+                                String hnp = null;
+                                Log.verb("checking uri " + us);
+
+                                if (us.toLowerCase().startsWith(stun)) {
+                                    hnp = us.substring(stun.length());
+                                    Log.verb("stun host " + hnp);
+                                }
+                                return hnp;
+                            }
+                    ).filter((String host) -> {
+                        Log.verb("stunhost is " + host);
+                        return host != null;
+                    });
+                    stuns.forEach((String ss) -> {
+                        Log.debug("Process stun server " + ss);
+                    });
+                });
+    }
+
+    private void gatherRelay(List<RTCIceServer> servers) {
     }
 }

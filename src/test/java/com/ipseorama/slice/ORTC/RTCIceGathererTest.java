@@ -90,7 +90,7 @@ public class RTCIceGathererTest {
         List<RTCIceCandidate> lc = instance.getLocalCandidates();
         assert (lc.size() >0);
     }
-    /*
+    
     @Test
     public void testGatherReflex() throws URISyntaxException {
         
@@ -100,13 +100,16 @@ public class RTCIceGathererTest {
         //    {url: "turn:146.148.121.175:443?transport=tcp", 'credential': 'nexus5x', 'username': 'smartphone'}
         //],
         
-        System.out.println("gather");
+        System.out.println("gatherReflex");
         RTCIceGatherOptions options = new RTCIceGatherOptions();
         options.setGatherPolicy(RTCIceGatherPolicy.ALL);
         ArrayList<RTCIceServer> iceServers = new ArrayList < RTCIceServer> ();
         ArrayList<URI> u = new ArrayList <URI>();
-        URI stun = new URI("stun:146.148.121.175:3478");
-        u.add(stun);
+        u.add(new URI("stun:146.148.121.175:3478"));
+        u.add(new URI("stun:stun.phoneserve.com:3478"));
+        u.add(new URI("stun:stun.noc.ams-ix.net:3478"));
+        u.add(new URI("stun:stun.sipgate.net:3478"));
+
         String uname = null;
         String cred = null; 
         RTCIceCredentialType credType = null;
@@ -118,7 +121,7 @@ public class RTCIceGathererTest {
         // TODO review the generated test code and remove the default call to fail.
         fail("The test case is a prototype.");
     }
-     */
+    
     /**
      * Test of getLocalParameters method, of class RTCIceGatherer.
      */
@@ -163,35 +166,7 @@ public class RTCIceGathererTest {
         fail("The test case is a prototype.");
     }
      */
-    /**
-     * Test of setState method, of class RTCIceGatherer.
-     */
-    /*
-    @Test
-    public void testSetState() {
-        System.out.println("setState");
-        RTCIceGathererState _state = null;
-        RTCIceGatherer instance = new RTCIceGatherer();
-        instance.setState(_state);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-     */
-    /**
-     * Test of getOnstatechange method, of class RTCIceGatherer.
-     */
-    /*
-    @Test
-    public void testGetOnstatechange() {
-        System.out.println("getOnstatechange");
-        RTCIceGatherer instance = new RTCIceGatherer();
-        EventHandler expResult = null;
-        EventHandler result = instance.getOnstatechange();
-        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-     */
+
     /**
      * Test of setOnstatechange method, of class RTCIceGatherer.
      */
@@ -222,62 +197,4 @@ public class RTCIceGathererTest {
         assert (state == RTCIceGathererState.GATHERING);
     }
 
-    /**
-     * Test of getOnerror method, of class RTCIceGatherer.
-     */
-    /*
-    @Test
-    public void testGetOnerror() {
-        System.out.println("getOnerror");
-        RTCIceGatherer instance = new RTCIceGatherer();
-        EventHandler expResult = null;
-        EventHandler result = instance.getOnerror();
-        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-     */
-    /**
-     * Test of setOnerror method, of class RTCIceGatherer.
-     */
-    /*
-    @Test
-    public void testSetOnerror() {
-        System.out.println("setOnerror");
-        EventHandler onerror = null;
-        RTCIceGatherer instance = new RTCIceGatherer();
-        instance.setOnerror(onerror);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-     */
-    /**
-     * Test of getOnlocalcandidate method, of class RTCIceGatherer.
-     */
-    /*
-    @Test
-    public void testGetOnlocalcandidate() {
-        System.out.println("getOnlocalcandidate");
-        RTCIceGatherer instance = new RTCIceGatherer();
-        EventHandler expResult = null;
-        EventHandler result = instance.getOnlocalcandidate();
-        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-     */
-    /**
-     * Test of setOnlocalcandidate method, of class RTCIceGatherer.
-     */
-    /*
-    @Test
-    public void testSetOnlocalcandidate() {
-        System.out.println("setOnlocalcandidate");
-        EventHandler onlocalcandidate = null;
-        RTCIceGatherer instance = new RTCIceGatherer();
-        instance.setOnlocalcandidate(onlocalcandidate);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
-     */
 }
