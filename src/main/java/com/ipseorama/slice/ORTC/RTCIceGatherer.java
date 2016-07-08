@@ -5,17 +5,21 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.stun.StunBindingTransaction;
+import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidateType;
 import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.ipseorama.slice.ORTC.enums.RTCIceGatherPolicy;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.ORTC.enums.RTCIceTcpCandidateType;
+import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URI;
@@ -51,11 +55,14 @@ For incoming connectivity checks that pass validation,
     private RTCIceComponent _component;
     DatagramSocket _sock; // should this be a property of the component ?
     ArrayList<RTCIceCandidate> _localCandidates;
+    IceEngine _ice;
+    private final StunTransactionManager _stm;
 
     public RTCIceGatherer() {
         _localCandidates = new ArrayList();
         _component = RTCIceComponent.RTP;
         _state = RTCIceGathererState.NEW;
+        _stm = new StunTransactionManager();
     }
 
     RTCIceComponent getIceComponent() {
@@ -178,6 +185,9 @@ For incoming connectivity checks that pass validation,
         _sock = allocateUdpSocket(options.getPortMin(), options.getPortMax());
         RTCIceGatherPolicy policy = options.getGatherPolicy();
         List<RTCIceServer> servers = options.getIceServers();
+        if ((_ice != null) && (!_ice.isStarted())) {
+            _ice.start(_sock, _stm);
+        }
         switch (policy) {
             case NOHOST:
                 gatherReflex(servers);
@@ -291,11 +301,49 @@ For incoming connectivity checks that pass validation,
                         return host != null;
                     });
                     stuns.forEach((String ss) -> {
-                        Log.debug("Process stun server " + ss);
+                        String bits[] = ss.split(":");
+                        String host = null;
+                        int port = 3478;
+                        if (bits.length == 2) {
+                            host = bits[0];
+                            port = Integer.parseInt(bits[1]);
+                        }
+                        if (bits.length == 1) {
+                            host = bits[0];
+                        }
+                        if (host != null) {
+                            StunBindingTransaction sbt = new StunBindingTransaction(host, port);
+                            sbt.oncomplete = (RTCEventData e) -> {
+                                Log.debug("got binding reply - or timeout");
+                                if (e instanceof RTCTimeoutEvent) {
+                                    Log.debug("got binding timeout");
+                                }
+                                if (e instanceof StunBindingTransaction) {
+                                    InetSocketAddress ref = ((StunBindingTransaction) e).getReflex();
+                                    if (ref != null) {
+                                        String foundation = "1";
+                                        long priority = 1000; // to do
+                                        RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
+                                                priority,
+                                                ref.getAddress().getHostAddress(),
+                                                RTCIceProtocol.UDP,
+                                                (char) ref.getPort(),
+                                                RTCIceCandidateType.SRFLX,
+                                                null);
+                                        addLocalCandidate(cand4);
+                                    }
+                                }
+                            };
+                            _stm.addTransaction(sbt);
+                        }
                     });
                 });
     }
 
     private void gatherRelay(List<RTCIceServer> servers) {
+    }
+
+    void setIceEngine(IceEngine tie) {
+        _ice = tie;
     }
 }

@@ -5,10 +5,13 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.IceEngine;
+import com.ipseorama.slice.ORTC.enums.RTCIceCandidateType;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.ipseorama.slice.ORTC.enums.RTCIceCredentialType;
 import com.ipseorama.slice.ORTC.enums.RTCIceGatherPolicy;
 import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
+import com.ipseorama.slice.ThreadedIceEngine;
 import com.phono.srtplight.Log;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -88,40 +91,60 @@ public class RTCIceGathererTest {
             }
         }
         List<RTCIceCandidate> lc = instance.getLocalCandidates();
-        assert (lc.size() >0);
+        assert (lc.size() > 0);
     }
-    
+
     @Test
     public void testGatherReflex() throws URISyntaxException {
-        
+
         //        "iceServers": [
         //    {urls: "stun:146.148.121.175:3478"},
         //    {urls: "turn:146.148.121.175:3478?transport=udp", 'credential': 'nexus5x', 'username': 'smartphone'},
         //    {url: "turn:146.148.121.175:443?transport=tcp", 'credential': 'nexus5x', 'username': 'smartphone'}
         //],
-        
         System.out.println("gatherReflex");
         RTCIceGatherOptions options = new RTCIceGatherOptions();
         options.setGatherPolicy(RTCIceGatherPolicy.ALL);
-        ArrayList<RTCIceServer> iceServers = new ArrayList < RTCIceServer> ();
-        ArrayList<URI> u = new ArrayList <URI>();
+        ArrayList<RTCIceServer> iceServers = new ArrayList< RTCIceServer>();
+        ArrayList<URI> u = new ArrayList<URI>();
         u.add(new URI("stun:146.148.121.175:3478"));
-        u.add(new URI("stun:stun.phoneserve.com:3478"));
         u.add(new URI("stun:stun.noc.ams-ix.net:3478"));
         u.add(new URI("stun:stun.sipgate.net:3478"));
 
         String uname = null;
-        String cred = null; 
+        String cred = null;
         RTCIceCredentialType credType = null;
-        RTCIceServer e = new RTCIceServer(u,uname,cred,credType);
+        RTCIceServer e = new RTCIceServer(u, uname, cred, credType);
         iceServers.add(e);
         options.setIceServers(iceServers);
         RTCIceGatherer instance = new RTCIceGatherer();
+        instance.onlocalcandidate = (RTCEventData d) -> {
+            Log.debug("local candidate " + d.toString());
+            if (d instanceof RTCIceCandidate) {
+                RTCIceCandidate can = (RTCIceCandidate) d;
+                if (can.getType().equals(RTCIceCandidateType.SRFLX)) {
+                    synchronized (instance) {
+                        instance.notifyAll();
+                    }
+                }
+            }
+        };
+        IceEngine tie = new ThreadedIceEngine();
+        instance.setIceEngine(tie);
         instance.gather(options);
         // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
+        synchronized (instance) {
+            try {
+                instance.wait(30000);
+            } catch (InterruptedException ex) {
+                ;
+            }
+        }
+        List<RTCIceCandidate> cands = instance.getLocalCandidates();
+        boolean m = cands.stream().anyMatch((RTCIceCandidate c) -> { return c.getType() == RTCIceCandidateType.SRFLX; });
+        assert(m);
     }
-    
+
     /**
      * Test of getLocalParameters method, of class RTCIceGatherer.
      */
@@ -166,12 +189,11 @@ public class RTCIceGathererTest {
         fail("The test case is a prototype.");
     }
      */
-
     /**
      * Test of setOnstatechange method, of class RTCIceGatherer.
      */
-
     @Test
+
     public void testSetOnstatechange() {
         System.out.println("----> setOnstatechange");
         RTCIceGatherer instance = new RTCIceGatherer();

@@ -6,12 +6,15 @@
 package com.ipseorama.slice.stun;
 
 import com.phono.srtplight.Log;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import javax.crypto.Mac;
 import javax.crypto.ShortBufferException;
@@ -23,7 +26,7 @@ import javax.crypto.spec.SecretKeySpec;
  */
 public class StunPacket {
 
-    static int MTU = 1400;
+    public static int MTU = 1400;
     static int MILENGTH = 24;
     static int FPLEN = 8;
     static long STUNCOOKIE = 0x2112A442;
@@ -66,6 +69,11 @@ public class StunPacket {
     short _mtype;
     byte[] _tid;
     byte[] _pass;
+    private InetSocketAddress _far;
+
+    public byte[] outboundBytes() throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
+        return outboundBytes(_pass);
+    }
 
     /*
 0                   1                   2                   3
@@ -130,21 +138,23 @@ public class StunPacket {
         for (StunAttribute a : attributes) {
             Log.debug("putting attribute " + a.getName() + " at " + bb.position());
             len += a.put(bb);
-            bb.putChar(2, (char) len); // update the length            
-            if (a.getName().equals("MESSAGE-INTEGRITY")) {
-                byte[] mi = calculateMessageIntegrity(pass, bb, false);
-                int start = bb.position() - mi.length;
-                for (int i = start; i < bb.position(); i++) {
-                    bb.put(i, mi[i - start]);
+            bb.putChar(2, (char) len); // update the length 
+            if (a.getName() != null) {
+                if (a.getName().equals("MESSAGE-INTEGRITY")) {
+                    byte[] mi = calculateMessageIntegrity(pass, bb, false);
+                    int start = bb.position() - mi.length;
+                    for (int i = start; i < bb.position(); i++) {
+                        bb.put(i, mi[i - start]);
+                    }
                 }
-            }
-            if (a.getName().equals("FINGERPRINT")) {
-                byte[] rawpack = new byte[bb.position()];
-                for (int i = 0; i < rawpack.length; i++) {
-                    rawpack[i] = bb.get(i);
+                if (a.getName().equals("FINGERPRINT")) {
+                    byte[] rawpack = new byte[bb.position()];
+                    for (int i = 0; i < rawpack.length; i++) {
+                        rawpack[i] = bb.get(i);
+                    }
+                    int fp = calculateFingerprint(rawpack);
+                    bb.putInt(bb.position() - 4, fp);
                 }
-                int fp = calculateFingerprint(rawpack);
-                bb.putInt(bb.position() - 4, fp);
             }
         }
         return len;
@@ -173,11 +183,13 @@ public class StunPacket {
         String realm = null;
         String username = null;
         for (StunAttribute a : attributes) {
-            if (a.getName().equals("USERNAME")) {
-                username = a.getString();
-            }
-            if (a.getName().equals("REALM")) {
-                realm = a.getString();
+            if (a.getName() != null) {
+                if (a.getName().equals("USERNAME")) {
+                    username = a.getString();
+                }
+                if (a.getName().equals("REALM")) {
+                    realm = a.getString();
+                }
             }
         }
         if (username != null) {
@@ -202,7 +214,7 @@ public class StunPacket {
     static boolean hasAttribute(ArrayList<StunAttribute> attributes, String aname) {
         boolean ret = false;
         for (StunAttribute a : attributes) {
-            if (a.getName().equals(aname)) {
+            if ((a.getName() != null) && (a.getName().equals(aname))) {
                 ret = true;
                 break;
             }
@@ -214,7 +226,7 @@ public class StunPacket {
     The idea of these static methods is basically paranoia - no stunpacket object is created untill
     the packet has passed validation checks. It also ensures we can create the correct type.
      */
-    static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass) throws Exception {
+    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass) throws Exception {
         StunPacket ret = null;
         if (inbound.length >= 20) {
             ByteBuffer b_frame = ByteBuffer.wrap(inbound);
@@ -283,25 +295,27 @@ public class StunPacket {
         for (StunAttribute a : attributes) {
             String name = a.getName();
             Log.debug("attribute " + name);
-            if (name.equals("FINGERPRINT")) {
-                Log.debug("Checking stun fingerprint");
-                fpOk = (a.getInt() == fingerprint);
-            }
-            if (name.equals("MESSAGE-INTEGRITY") && (messageIntegrity != null)) {
-                Log.debug("Checking mi");
-                byte mi[] = a.getBytes();
-                if (mi.length == messageIntegrity.length) {
-                    int i = 0;
-                    for (; i < mi.length; i++) {
-                        if (mi[i] != messageIntegrity[i]) {
-                            break;
-                        }
-                    }
-                    miOk = (i == messageIntegrity.length);
+            if (name != null) {
+                if (name.equals("FINGERPRINT")) {
+                    Log.debug("Checking stun fingerprint");
+                    fpOk = (a.getInt() == fingerprint);
                 }
-            }
-            if (name.equals("USERNAME")) {
-                Log.debug("username is: " + a.getString());
+                if (name.equals("MESSAGE-INTEGRITY") && (messageIntegrity != null)) {
+                    Log.debug("Checking mi");
+                    byte mi[] = a.getBytes();
+                    if (mi.length == messageIntegrity.length) {
+                        int i = 0;
+                        for (; i < mi.length; i++) {
+                            if (mi[i] != messageIntegrity[i]) {
+                                break;
+                            }
+                        }
+                        miOk = (i == messageIntegrity.length);
+                    }
+                }
+                if (name.equals("USERNAME")) {
+                    Log.debug("username is: " + a.getString());
+                }
             }
         }
         if (!fpOk && fingerprint != null) {
@@ -332,6 +346,27 @@ public class StunPacket {
         _attributes = attrs;
     }
 
+    /**
+     * @return the _far
+     */
+    public InetSocketAddress getFar() {
+        return _far;
+    }
+
+    /**
+     * @param _far the far Address to set
+     */
+    public void setFar(InetSocketAddress far) {
+        if (far.isUnresolved()) {
+            String fs = far.getHostName();
+            Log.debug("tried to resolve " + fs);
+        }
+        if (far.isUnresolved()) {
+            Log.debug("failed to resolve " + far);
+        } else {
+            this._far = far;
+        }
+    }
 
     static class FingerPrintException extends Exception {
 
@@ -384,5 +419,31 @@ class StunBindingResponse extends StunPacket {
 
     public StunBindingResponse() {
         super((short) 0x0101);
+    }
+
+    InetSocketAddress getReflex() {
+        InetSocketAddress i = null;
+// prefer to use the xor address - but if it isn't there, use the plain one.
+        try {
+            Object[] iat = _attributes.stream().filter((StunAttribute a) -> {
+                return ((a.getName() != null) && (a.getName().equals("XOR-MAPPED-ADDRESS")));
+            }).toArray();
+            if (iat.length < 1) {
+                Log.warn("no xor-Address attributes in this BindingResponse");
+                iat = _attributes.stream().filter((StunAttribute a) -> {
+                    return ((a.getName() != null) && (a.getName().equals("MAPPED-ADDRESS")));
+                }).toArray();
+            }
+            if (iat.length >= 1) {
+                StunAttribute at = (StunAttribute) iat[0];
+                Log.debug("Address attributes in this BindingResponse " + at.getName());
+                i = (at.getName().equals("XOR-MAPPED-ADDRESS")) ? at.getXorIpAddress(_tid) : at.getIpAddress();
+            } else {
+                Log.warn("no Address attributes in this BindingResponse");
+            }
+        } catch (UnknownHostException ex) {
+            Log.error("Problem getting socket address" + ex);
+        }
+        return i;
     }
 }

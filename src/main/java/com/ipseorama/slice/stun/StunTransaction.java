@@ -8,6 +8,7 @@ package com.ipseorama.slice.stun;
 import com.ipseorama.slice.ORTC.EventHandler;
 import java.math.BigInteger;
 import java.security.SecureRandom;
+import java.util.Arrays;
 
 /**
  *
@@ -40,9 +41,11 @@ public abstract class StunTransaction {
      * @param pk 
      */
     public StunTransaction(StunPacket pk) {
-        
+        id = pk.getTid();
     }
-    
+    Integer getTidHash(){
+        return Arrays.hashCode(id);
+    }
     /**
      * true when a satisfactory reply has happened.
      * @return 
@@ -50,8 +53,12 @@ public abstract class StunTransaction {
     boolean isComplete(){
         return complete;
     }
-    
-    public abstract void receive(StunPacket r);
+    /**
+     * when we get a stun packet who's transaction ID matches this object,
+     * pass it here for processing
+     * @param r 
+     */
+    public abstract void received(StunPacket r);
 
     public abstract StunPacket buildOutboundPacket();
 

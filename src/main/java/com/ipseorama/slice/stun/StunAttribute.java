@@ -102,8 +102,9 @@ public class StunAttribute {
     }
 
     void setString(String s) {
-        aVal = ByteBuffer.wrap(s.getBytes());
         aLen = s.length();
+        aVal = ByteBuffer.allocate(aLen);
+        aVal.put(s.getBytes());
     }
 
     String getString() {
@@ -172,6 +173,35 @@ public class StunAttribute {
         }
         InetAddress inetAd = java.net.InetAddress.getByAddress(addressBytes);
         return new InetSocketAddress(inetAd, port);
+    }
+
+    InetSocketAddress getXorIpAddress(byte[] tid) throws UnknownHostException {
+        // RFC assumes you'll be pointer diddling in C - so this is ugly.
+        // we need to xor the v6 address with bytes 4->20 of the packet.
+        // which encompasses the cookie and the TID concatenated.
+        // cookie is already there
+
+        byte iptype = aVal.get(1);
+        char port = (char) ((0xffff) & aVal.getChar(2));
+
+        // port is always xor'd with the COOKIE
+        int xport = (port ^ (char) (StunPacket.STUNCOOKIE >> 16));
+
+        // so xor the address bytes with the current packet content.
+        int addresslen = (iptype == 1) ? 4 : 16;
+        ByteBuffer xb = ByteBuffer.allocate(addresslen);
+
+        xb.putInt((int) StunPacket.STUNCOOKIE);
+        if (addresslen == 16) {
+            xb.put(tid); // for v6 we need the TID in this buffer.
+        }
+        byte[] addressBytes = (iptype == 1) ? new byte[4] : new byte[16];
+
+        for (int i = 0; i < addressBytes.length; i++) {
+            addressBytes[i] = (byte) (aVal.get(4 + i) ^ xb.get(i));
+        }
+        InetAddress inetAd = java.net.InetAddress.getByAddress(addressBytes);
+        return new InetSocketAddress(inetAd, xport);
     }
 
     void setIpAddress(InetSocketAddress addr) {
