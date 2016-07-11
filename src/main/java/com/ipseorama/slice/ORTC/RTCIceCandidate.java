@@ -9,12 +9,13 @@ import com.ipseorama.slice.ORTC.enums.RTCIceTcpCandidateType;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidateType;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
+import com.phono.srtplight.Log;
 
 /**
  *
  * @author tim
  */
-public class RTCIceCandidate implements RTCIceGatherCandidate,RTCEventData{
+public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
 
     private String foundation;
     private Long priority;
@@ -174,25 +175,34 @@ public class RTCIceCandidate implements RTCIceGatherCandidate,RTCEventData{
     }
 
     String toSDP(RTCIceComponent component) {
-        int cno = (component == component.RTP )? 1:2;
+        int cno = (component == component.RTP) ? 1 : 2;
         StringBuffer ret = new StringBuffer("candidate:");
         ret.append(this.foundation).append(" ");
         ret.append(cno).append(" ");
         ret.append(protocol).append(" ");
         ret.append(priority).append(" ");
         ret.append(ip).append(" ");
-        ret.append((int)port).append(" ");
+        ret.append((int) port).append(" ");
         ret.append("typ ").append(type).append(" ");
         ret.append("generation ").append(generation).append(" ");
-        if (this.relatedAddress != null){
+        if (this.relatedAddress != null) {
             ret.append("raddr ").append(relatedAddress).append(" ");
-            ret.append("rport ").append(relatedPort).append(" ");
+            ret.append("rport ").append("" + (int) relatedPort).append(" ");
             // raddr 192.67.4.33 rport 60003
         }
         // candidate:1365833797 1 udp 2113939711 2a01:348:339::57a:65d1:a0b4:a83 51309 typ host generation 0
         return ret.toString().trim();
     }
-    public String toString(){
+
+    public String toString() {
         return this.toSDP(RTCIceComponent.RTP);
+    }
+
+    boolean sameEnough(RTCIceCandidate cand) {
+        boolean ret = this.getIp().equals(cand.getIp()) && this.getPort() == cand.getPort() && this.getProtocol().equals(cand.getProtocol());
+        if (ret) {
+            Log.verb("candidates are similar " + this + " vs " + cand);
+        }
+        return ret;
     }
 }

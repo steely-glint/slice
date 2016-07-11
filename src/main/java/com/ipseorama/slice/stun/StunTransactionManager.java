@@ -30,6 +30,7 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
     }
 
     public void receivedPacket(StunPacket p){
+        Log.debug("recvd stun packet from "+p.getFar());
         Integer tid = Arrays.hashCode(p.getTid());
         StunTransaction t = this.get(tid);
         if (t != null) {
@@ -67,4 +68,5 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
         }).collect(Collectors.toList());
         return pkts;
     }
+
 }

@@ -104,7 +104,7 @@ public class RTCIceGathererTest {
         //],
         System.out.println("gatherReflex");
         RTCIceGatherOptions options = new RTCIceGatherOptions();
-        options.setGatherPolicy(RTCIceGatherPolicy.ALL);
+        options.setGatherPolicy(RTCIceGatherPolicy.NOHOST);
         ArrayList<RTCIceServer> iceServers = new ArrayList< RTCIceServer>();
         ArrayList<URI> u = new ArrayList<URI>();
         u.add(new URI("stun:146.148.121.175:3478"));

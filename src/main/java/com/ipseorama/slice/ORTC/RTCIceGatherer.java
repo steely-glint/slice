@@ -20,6 +20,7 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URI;
@@ -96,6 +97,7 @@ For incoming connectivity checks that pass validation,
                 Log.debug("Adding interface: " + ni.getDisplayName());
                 if (ni.isUp()) {
                     Enumeration ipads = ni.getInetAddresses();
+                    List<InterfaceAddress> iads = ni.getInterfaceAddresses();
                     Inet4Address home = null;
                     Inet6Address home6 = null;
                     while (ipads.hasMoreElements()) {
@@ -168,11 +170,14 @@ For incoming connectivity checks that pass validation,
     }
 
     void addLocalCandidate(RTCIceCandidate cand) {
-        _localCandidates.add(cand);
-        if (this.onlocalcandidate != null) {
-            onlocalcandidate.onEvent(cand);
+        if (!_localCandidates.stream().anyMatch((RTCIceCandidate ec) -> {return ec.sameEnough(cand);})) {
+            _localCandidates.add(cand);
+            if (this.onlocalcandidate != null) {
+                onlocalcandidate.onEvent(cand);
+            }
+        } else {
+            Log.debug("Skipping candidate as similar candidate is already present " + cand);
         }
-
     }
 
     public void gather(RTCIceGatherOptions options) {
@@ -330,8 +335,16 @@ For incoming connectivity checks that pass validation,
                                                 (char) ref.getPort(),
                                                 RTCIceCandidateType.SRFLX,
                                                 null);
+                                        String raddr = _sock.getLocalAddress().getHostAddress();
+                                        char rport = (char) _sock.getLocalPort();
+                                        cand4.setRelatedAddress(raddr);
+                                        cand4.setRelatedPort(rport);
                                         addLocalCandidate(cand4);
                                     }
+                                }
+                                _stm.removeComplete();
+                                if (_stm.size() == 0) {
+                                    setState(RTCIceGathererState.COMPLETE);
                                 }
                             };
                             _stm.addTransaction(sbt);
@@ -341,6 +354,7 @@ For incoming connectivity checks that pass validation,
     }
 
     private void gatherRelay(List<RTCIceServer> servers) {
+        // massive, massive to-do - Implement TURN UDP and TURN TLS
     }
 
     void setIceEngine(IceEngine tie) {
