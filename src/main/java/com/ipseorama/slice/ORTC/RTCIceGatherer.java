@@ -91,6 +91,7 @@ For incoming connectivity checks that pass validation,
         try {
             Enumeration nifs = NetworkInterface.getNetworkInterfaces();
             int i = 0;
+            int lpref = Character.MAX_VALUE;
             while (nifs.hasMoreElements()) {
                 NetworkInterface ni = (NetworkInterface) nifs.nextElement();
                 byte[] hw = ni.getHardwareAddress();
@@ -130,23 +131,11 @@ For incoming connectivity checks that pass validation,
                         }
                     }
                     localAdd.append(" " + ni.getDisplayName() + " ");
-                    if (home != null) {
-                        localAdd.append(home.getHostAddress());
-                        String foundation = "1";
-                        long priority = 1; // to do
-                        RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
-                                priority,
-                                home.getHostAddress(),
-                                RTCIceProtocol.UDP,
-                                (char) _sock.getLocalPort(),
-                                RTCIceCandidateType.HOST,
-                                null);
-                        addLocalCandidate(cand4);
-                    }
                     if (home6 != null) {
                         localAdd.append(" [" + home6.getHostAddress() + "]");
                         String foundation = "1";
-                        long priority = 1; // to do
+                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
+                        lpref -= 6;
                         RTCIceCandidate cand6 = new RTCIceCandidate(foundation,
                                 priority,
                                 home6.getHostAddress(),
@@ -156,6 +145,21 @@ For incoming connectivity checks that pass validation,
                                 null);
                         addLocalCandidate(cand6);
                     }
+                    if (home != null) {
+                        localAdd.append(home.getHostAddress());
+                        String foundation = "1";
+                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
+                        lpref -= 4;
+                        RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
+                                priority,
+                                home.getHostAddress(),
+                                RTCIceProtocol.UDP,
+                                (char) _sock.getLocalPort(),
+                                RTCIceCandidateType.HOST,
+                                null);
+                        addLocalCandidate(cand4);
+                    }
+
                 } else {
                     Log.debug("Ignoring interface: " + ni.getDisplayName());
                 }
@@ -170,7 +174,9 @@ For incoming connectivity checks that pass validation,
     }
 
     void addLocalCandidate(RTCIceCandidate cand) {
-        if (!_localCandidates.stream().anyMatch((RTCIceCandidate ec) -> {return ec.sameEnough(cand);})) {
+        if (!_localCandidates.stream().anyMatch((RTCIceCandidate ec) -> {
+            return ec.sameEnough(cand);
+        })) {
             _localCandidates.add(cand);
             if (this.onlocalcandidate != null) {
                 onlocalcandidate.onEvent(cand);
@@ -327,7 +333,7 @@ For incoming connectivity checks that pass validation,
                                     InetSocketAddress ref = ((StunBindingTransaction) e).getReflex();
                                     if (ref != null) {
                                         String foundation = "1";
-                                        long priority = 1000; // to do
+                                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort()/2), RTCIceComponent.RTP); 
                                         RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
                                                 priority,
                                                 ref.getAddress().getHostAddress(),

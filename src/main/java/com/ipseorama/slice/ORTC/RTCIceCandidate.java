@@ -205,4 +205,50 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
         }
         return ret;
     }
+
+    /*
+    If these concerns are important, the
+   type preference for relayed candidates SHOULD be lower than host
+   candidates.  The RECOMMENDED values are 126 for host candidates, 100
+   for server reflexive candidates, 110 for peer reflexive candidates,
+   and 0 for relayed candidates.  Furthermore, if an agent is multihomed
+   and has multiple IP addresses, the local preference for host
+   candidates from a VPN interface SHOULD have a priority of 0.
+
+   Another criterion for selection of preferences is IP address family.
+   ICE works with both IPv4 and IPv6.  It therefore provides a
+   transition mechanism that allows dual-stack hosts to prefer
+   connectivity over IPv6, but to fall back to IPv4 in case the v6
+   networks are disconnected (due, for example, to a failure in a 6to4
+   relay) [RFC3056].  It can also help with hosts that have both a
+   native IPv6 address and a 6to4 address.  In such a case, higher local
+   preferences could be assigned to the v6 addresses, followed by the
+   6to4 addresses, followed by the v4 addresses.  This allows a site to
+   obtain and begin using native v6 addresses immediately, yet still
+   fall back to 6to4 addresses when communicating with agents in other
+   sites that do not yet have native v6 connectivity.
+     */
+
+    static int calcPriority(RTCIceCandidateType ctype, char localpref, RTCIceComponent comp) {
+        int ctv = 0;
+        switch (ctype) {
+            case HOST:
+                ctv = 126;
+                break;
+            case SRFLX:
+                ctv = 100;
+                break;
+            case PRFLX:
+                ctv = 110;
+                break;
+            case RELAY:
+                ctv = 0;
+                break;
+        }
+        int priority = (2 ^ 24) * (ctv)
+                + (2 ^ 8) * (localpref)
+                + (2 ^ 0) * (256 - comp.ordinal());
+        return priority;
+
+    }
 }

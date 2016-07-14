@@ -5,12 +5,8 @@
  */
 package com.ipseorama.slice.stun;
 
-import com.phono.srtplight.Log;
 import java.net.DatagramPacket;
-import java.net.InetSocketAddress;
 import java.util.Queue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *

@@ -141,8 +141,10 @@ public class RTCIceGathererTest {
             }
         }
         List<RTCIceCandidate> cands = instance.getLocalCandidates();
-        boolean m = cands.stream().anyMatch((RTCIceCandidate c) -> { return c.getType() == RTCIceCandidateType.SRFLX; });
-        assert(m);
+        boolean m = cands.stream().anyMatch((RTCIceCandidate c) -> {
+            return c.getType() == RTCIceCandidateType.SRFLX;
+        });
+        assert (m);
     }
 
     /**
@@ -199,24 +201,31 @@ public class RTCIceGathererTest {
         RTCIceGatherer instance = new RTCIceGatherer();
         instance.onstatechange = (RTCEventData d) -> {
             Log.debug("state is now " + d.toString());
-            synchronized (instance) {
-                instance.notifyAll();
+            if (instance.getState() == RTCIceGathererState.COMPLETE) {
+                synchronized (instance) {
+                    instance.notifyAll();
+                }
             }
         };
         RTCIceGatherOptions options = new RTCIceGatherOptions();
         options.setGatherPolicy(RTCIceGatherPolicy.ALL);
         ArrayList<RTCIceServer> iceServers = new ArrayList<RTCIceServer>();
         options.setIceServers(iceServers);
+        IceEngine tie = new ThreadedIceEngine();
+        instance.setIceEngine(tie);
         instance.gather(options);
         synchronized (instance) {
             try {
-                instance.wait(10000);
+                instance.wait(30000);
             } catch (InterruptedException ex) {
                 ;
             }
         }
         RTCIceGathererState state = instance.getState();
-        assert (state == RTCIceGathererState.GATHERING);
+        instance.getLocalCandidates().forEach((RTCIceCandidate c) -> {
+            Log.debug("local candidate " + c.toSDP(RTCIceComponent.RTP));
+        });
+        assert (state == RTCIceGathererState.COMPLETE);
     }
 
 }
