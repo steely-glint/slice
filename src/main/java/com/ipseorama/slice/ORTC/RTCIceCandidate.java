@@ -10,6 +10,7 @@ import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidateType;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.phono.srtplight.Log;
+import java.net.InetAddress;
 
 /**
  *
@@ -27,6 +28,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     private String relatedAddress;
     private char relatedPort;
     private int generation;
+    private int ipVersion = 6;
 
 
     /*String              relatedAddress;
@@ -250,5 +252,41 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
                 + (2 ^ 0) * (256 - comp.ordinal());
         return priority;
 
+    }
+    /*
+    4.1.1.3.  Computing Foundations
+
+   Finally, the agent assigns each candidate a foundation.  The
+   foundation is an identifier, scoped within a session.  Two candidates
+   MUST have the same foundation ID when all of the following are true:
+
+   o  they are of the same type (host, relayed, server reflexive, or
+      peer reflexive).
+
+   o  their bases have the same IP address (the ports can be different).
+
+   o  for reflexive and relayed candidates, the STUN or TURN servers
+      used to obtain them have the same IP address.
+
+   o  they were obtained using the same transport protocol (TCP, UDP,
+      etc.).
+
+   Similarly, two candidates MUST have different foundations if their
+   types are different, their bases have different IP addresses, the
+   STUN or TURN servers used to obtain them have different IP addresses,
+   or their transport protocols are different.
+
+    */
+    static String calcFoundation(RTCIceCandidateType ctype,InetAddress base, InetAddress svr, RTCIceProtocol protocol ){
+       String thing=ctype.name() + base.getHostAddress()+(svr==null ? "0.0.0.0":svr.getHostAddress())+protocol.name();
+        String ret = Integer.toUnsignedString(thing.hashCode());
+        return ret;
+    }
+    int getIpVersion(){
+        return ipVersion;
+    }
+    
+    public void setIpVersion(int v){
+        ipVersion = v;
     }
 }

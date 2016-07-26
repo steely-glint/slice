@@ -26,6 +26,10 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
         dueTime = System.currentTimeMillis();
     }
 
+    public InetSocketAddress getFar(){
+        return _far;
+    }
+    
     @Override
     public void received(StunPacket r) {
         if (r instanceof StunBindingResponse) {

@@ -133,7 +133,7 @@ For incoming connectivity checks that pass validation,
                     localAdd.append(" " + ni.getDisplayName() + " ");
                     if (home6 != null) {
                         localAdd.append(" [" + home6.getHostAddress() + "]");
-                        String foundation = "1";
+                        String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
                         long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
                         lpref -= 6;
                         RTCIceCandidate cand6 = new RTCIceCandidate(foundation,
@@ -143,11 +143,12 @@ For incoming connectivity checks that pass validation,
                                 (char) _sock.getLocalPort(),
                                 RTCIceCandidateType.HOST,
                                 null);
+                        
                         addLocalCandidate(cand6);
                     }
                     if (home != null) {
                         localAdd.append(home.getHostAddress());
-                        String foundation = "1";
+                        String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
                         long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
                         lpref -= 4;
                         RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
@@ -157,6 +158,7 @@ For incoming connectivity checks that pass validation,
                                 (char) _sock.getLocalPort(),
                                 RTCIceCandidateType.HOST,
                                 null);
+                        cand4.setIpVersion(4);
                         addLocalCandidate(cand4);
                     }
 
@@ -324,27 +326,37 @@ For incoming connectivity checks that pass validation,
                         }
                         if (host != null) {
                             StunBindingTransaction sbt = new StunBindingTransaction(host, port);
+
                             sbt.oncomplete = (RTCEventData e) -> {
                                 Log.debug("got binding reply - or timeout");
                                 if (e instanceof RTCTimeoutEvent) {
                                     Log.debug("got binding timeout");
                                 }
                                 if (e instanceof StunBindingTransaction) {
-                                    InetSocketAddress ref = ((StunBindingTransaction) e).getReflex();
+
+                                    StunBindingTransaction st = (StunBindingTransaction) e;
+                                    InetSocketAddress ref = st.getReflex();
+
                                     if (ref != null) {
-                                        String foundation = "1";
-                                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort()/2), RTCIceComponent.RTP); 
+                                        RTCIceCandidateType type = RTCIceCandidateType.SRFLX;
+                                        RTCIceProtocol prot = RTCIceProtocol.UDP;
+                                        InetAddress raddr = _sock.getLocalAddress();
+                                        char rport = (char) _sock.getLocalPort();
+
+                                        String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
+                                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
                                         RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
                                                 priority,
                                                 ref.getAddress().getHostAddress(),
-                                                RTCIceProtocol.UDP,
+                                                prot,
                                                 (char) ref.getPort(),
-                                                RTCIceCandidateType.SRFLX,
+                                                type,
                                                 null);
-                                        String raddr = _sock.getLocalAddress().getHostAddress();
-                                        char rport = (char) _sock.getLocalPort();
-                                        cand4.setRelatedAddress(raddr);
+                                        cand4.setRelatedAddress(raddr.getHostAddress());
                                         cand4.setRelatedPort(rport);
+                                        if (ref.getAddress() instanceof java.net.Inet4Address){
+                                            cand4.setIpVersion(4);
+                                        }
                                         addLocalCandidate(cand4);
                                     }
                                 }

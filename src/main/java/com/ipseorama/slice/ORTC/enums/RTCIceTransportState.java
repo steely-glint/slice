@@ -5,11 +5,13 @@
  */
 package com.ipseorama.slice.ORTC.enums;
 
+import com.ipseorama.slice.ORTC.RTCEventData;
+
 /**
  *
  * @author tim
  */
-public enum RTCIceTransportState {
+public enum RTCIceTransportState implements RTCEventData{
     NEW() {
         @Override
         public String toString() {
