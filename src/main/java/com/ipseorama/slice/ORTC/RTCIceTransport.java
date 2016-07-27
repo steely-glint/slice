@@ -5,12 +5,15 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.phono.srtplight.Log;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 /**
  *
@@ -18,6 +21,7 @@ import java.util.List;
  */
 public class RTCIceTransport {
 
+    static int MAXCHECKS = 100;
     RTCIceGatherer iceGatherer;
     RTCIceRole role;
     final RTCIceComponent component;
@@ -25,6 +29,8 @@ public class RTCIceTransport {
     RTCIceParameters remoteParameters;
     List<RTCIceCandidate> remoteCandidates;
     List<RTCIceCandidatePair> candidatePairs;
+
+    private final Comparator<RTCIceCandidatePair> ordering;
 
     public RTCIceTransportState getRTCIceTransportState() {
         return state;
@@ -67,6 +73,7 @@ public class RTCIceTransport {
     public void addRemoteCandidate(RTCIceGatherCandidate remoteCandidate) {
         if (remoteCandidate instanceof RTCIceCandidate) {
             RTCIceCandidate r = (RTCIceCandidate) remoteCandidate;
+            this.remoteCandidates.add(r);
             List<RTCIceCandidate> locals = new ArrayList(iceGatherer.getLocalCandidates());
             for (RTCIceCandidate l : locals) {
                 addPair(l, r);
@@ -92,8 +99,19 @@ public class RTCIceTransport {
         this.iceGatherer = ig;
         this.role = r;
         this.component = comp;
-        this.state = state.NEW;
+        this.state = RTCIceTransportState.NEW;
         this.remoteCandidates = new ArrayList();
+        this.candidatePairs = new ArrayList();
+        this.ordering = (RTCIceCandidatePair p1, RTCIceCandidatePair p2) -> {
+            long lcp = p1.priority(role) - p2.priority(role);
+            int ret = 0;
+            if (lcp > 0) {
+                ret = 1;
+            } else if (lcp < 0) {
+                ret = -1;
+            }
+            return ret;
+        };
     }
 
     /**
@@ -107,7 +125,7 @@ public class RTCIceTransport {
     }
 
     private void addPair(RTCIceCandidate l, RTCIceCandidate r) {
-        if (l.getProtocol() == r.getProtocol() && l.getIpVersion() == r.getIpVersion())  {
+        if (l.getProtocol() == r.getProtocol() && l.getIpVersion() == r.getIpVersion()) {
             synchronized (candidatePairs) {
                 boolean present = candidatePairs.stream().anyMatch((RTCIceCandidatePair p) -> {
                     return p.getLocal().equals(l) && p.getRemote().equals(r);
@@ -116,14 +134,23 @@ public class RTCIceTransport {
                     RTCIceCandidatePair p = new RTCIceCandidatePair(l, r);
                     if (p != null) {
                         candidatePairs.add(p);
-                        Log.debug("added candidate pair "+p.toString());
+                        Log.debug("added candidate pair " + p.toString());
                     }
                 } else {
-                    Log.debug("ignoring exisiting candidate pair "+r.toString()+" "+l.toString());
+                    Log.debug("ignoring exisiting candidate pair " + r.toString() + " " + l.toString());
                 }
             }
         } else {
-            Log.debug("ignoring incompatiple candidate pair "+r.toString()+" "+l.toString());
+            Log.debug("ignoring incompatiple candidate pair " + r.toString() + " " + l.toString());
         }
     }
+    public RTCIceCandidatePair nextCheck(){
+        Optional<RTCIceCandidatePair> ret = candidatePairs.stream()
+                .sorted(ordering)
+                .limit(MAXCHECKS)
+                .filter((RTCIceCandidatePair icp) -> { return icp.getState() == RTCIceCandidatePairState.WAITING;})
+                .findFirst();
+        return ret.isPresent()?ret.get():null;
+    }
+    
 }

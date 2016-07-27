@@ -249,7 +249,7 @@ For incoming connectivity checks that pass validation,
     /**
      * @param _state the _state to set
      */
-    private void setState(RTCIceGathererState _state) {
+    protected void setState(RTCIceGathererState _state) {
         this._state = _state;
         if (this.onstatechange != null) {
             onstatechange.onEvent(_state);

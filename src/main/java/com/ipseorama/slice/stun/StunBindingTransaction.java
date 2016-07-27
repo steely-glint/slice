@@ -16,10 +16,10 @@ import java.net.InetSocketAddress;
  */
 public class StunBindingTransaction extends StunTransaction implements RTCEventData {
 
-    private InetSocketAddress _far;
+    protected InetSocketAddress _far;
     final static int TIMEOUT = 200; // a stun server that responds in > 1sec isn't of intrest.
     final static int MAXTRIES = 4;
-    private InetSocketAddress _ref;
+    protected InetSocketAddress _ref;
 
     public StunBindingTransaction(String host, int port) {
         _far = new InetSocketAddress(host, port);
@@ -57,6 +57,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
             bind = new StunBindingRequest();
             bind.setTid(this.getTid());
             bind.setFar(_far);
+            
             dueTime = System.currentTimeMillis() + (TIMEOUT * retries++);
         }
         return bind;
