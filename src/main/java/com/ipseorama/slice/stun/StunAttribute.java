@@ -5,11 +5,13 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -92,6 +94,42 @@ public class StunAttribute {
     static Integer findType(String name) {
         return __nameMap.get(name);
     }
+
+    static void addPriority(ArrayList<StunAttribute> attrs, int reflexPri) {
+        StunAttribute p = new StunAttribute("PRIORITY");
+        p.setInt(reflexPri);
+        attrs.add(p);
+    }
+
+    static void addIceCon(ArrayList<StunAttribute> attrs, RTCIceRole role,long tb) {
+        StunAttribute r = new StunAttribute("ICE-" + role.toString().toUpperCase());
+        r.setLong(tb);
+        attrs.add(r);
+    }
+
+    static void addFingerprint(ArrayList<StunAttribute> attrs) {
+        StunAttribute f = new StunAttribute("FINGERPRINT");
+        f.setInt(0);
+        attrs.add(f);
+    }
+
+    static void addMessageIntegrity(ArrayList<StunAttribute> attrs) {
+        StunAttribute mi = new StunAttribute("MESSAGE-INTEGRITY");
+        mi.setBytes(new byte[20]);
+        attrs.add(mi);
+    }
+
+    static void addUsername(ArrayList<StunAttribute> attrs, String outboundUser) {
+        StunAttribute u = new StunAttribute("USERNAME");
+        u.setString(outboundUser);
+        attrs.add(u);
+    }
+    static void addSoftware(ArrayList<StunAttribute> attrs) {
+        StunAttribute s = new StunAttribute("SOFTWARE");
+        s.setString("pe.pi.slice.ORTC");
+        attrs.add(s);
+    }
+    
     private final Integer aType;
     private int aLen;
     private ByteBuffer aVal;
