@@ -228,13 +228,40 @@ public class RTCIceTransportTest {
         }
         assertFalse(instance.candidatePairs.isEmpty());
         RTCIceCandidatePair cp;
-        int n=0;
-        while (null != ( cp = instance.nextCheck() )){
-            Log.debug("next candidate pair is :"+cp.toString());
+        int n = 0;
+        while (null != (cp = instance.nextCheck())) {
+            Log.debug("next candidate pair is :" + cp.toString());
             cp.setState(RTCIceCandidatePairState.INPROGRESS);
             n++;
         }
-        assertEquals(6,n);
+        assertEquals(6, n);
+    }
+
+    @Test
+    public void testMaxPairs() {
+        System.out.println("MaxPairs");
+        int mcc = RTCIceTransport.MAXCHECKS;
+        RTCIceTransport.MAXCHECKS = 3;
+        RTCIceGatherer gatherer = mkMockGatherer();
+        RTCIceParameters remoteParameters = null;
+        RTCIceRole role = RTCIceRole.CONTROLLING;
+        RTCIceTransport instance = new RTCIceTransport(gatherer, role, RTCIceComponent.RTP);
+        instance.start(gatherer, remoteParameters, role);
+        assertEquals(0, instance.remoteCandidates.size());
+        RTCIceCandidate[] rems = mkRemotes();
+        for (RTCIceCandidate r : rems) {
+            instance.addRemoteCandidate(r);
+        }
+        assertFalse(instance.candidatePairs.isEmpty());
+        RTCIceCandidatePair cp;
+        int n = 0;
+        while (null != (cp = instance.nextCheck())) {
+            Log.debug("next candidate pair is :" + cp.toString());
+            cp.setState(RTCIceCandidatePairState.INPROGRESS);
+            n++;
+        }
+        RTCIceTransport.MAXCHECKS = mcc;
+        assertEquals(3, n);
     }
 
     private RTCIceGatherer mkMockGatherer() {
