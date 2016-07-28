@@ -6,6 +6,7 @@
 package com.ipseorama.slice.stun;
 
 import com.phono.srtplight.Log;
+import java.net.InetSocketAddress;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,20 +26,20 @@ import static org.junit.Assert.*;
  * @author thp
  */
 public class StunPacketTest {
-    
+
     public StunPacketTest() {
     }
-    
+
     @BeforeClass
     public static void setUpClass() {
         Log.setLevel(Log.ALL);
-        
+
     }
-    
+
     @AfterClass
     public static void tearDownClass() {
     }
-    
+
     Map<String, String> passwords
             = Collections.unmodifiableMap(Stream.of(
                     new SimpleEntry<>("o3rvX/IW811zoMmQ", "N3Wk6Gk45aUN3w9z3zql1ZqI"),
@@ -51,7 +52,7 @@ public class StunPacketTest {
                     new SimpleEntry<>("smartphone", "nexus5x"),
                     new SimpleEntry<>("a88ag", "incorrect")
             ).collect(Collectors.toMap((e) -> e.getKey(), (e) -> e.getValue())));
-    
+
     byte[] emptyBindingRequest = {
         (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x00, (byte) 0x21, (byte) 0x12, (byte) 0xa4, (byte) 0x42, (byte) 0x2f, (byte) 0x67, (byte) 0x63, (byte) 0x76, (byte) 0x6b, (byte) 0x59, (byte) 0x64, (byte) 0x6a,
         (byte) 0x38, (byte) 0x41, (byte) 0x6d, (byte) 0x70};
@@ -63,7 +64,7 @@ public class StunPacketTest {
         (byte) 0x69, (byte) 0x78, (byte) 0x2d, (byte) 0x33, (byte) 0x2e, (byte) 0x32, (byte) 0x2e, (byte) 0x35, (byte) 0x2e, (byte) 0x35, (byte) 0x20, (byte) 0x27, (byte) 0x4d, (byte) 0x61, (byte) 0x72, (byte) 0x73,
         (byte) 0x68, (byte) 0x61, (byte) 0x6c, (byte) 0x20, (byte) 0x57, (byte) 0x65, (byte) 0x73, (byte) 0x74, (byte) 0x27, (byte) 0x28, (byte) 0x00, (byte) 0x04, (byte) 0x80, (byte) 0x28, (byte) 0x00, (byte) 0x04,
         (byte) 0xac, (byte) 0xf8, (byte) 0x7e, (byte) 0x01};
-    
+
     byte[] turnRequest = {
         (byte) 0x00, (byte) 0x03, (byte) 0x00, (byte) 0x08, (byte) 0x21, (byte) 0x12, (byte) 0xa4, (byte) 0x42, (byte) 0x67, (byte) 0x4f, (byte) 0x73, (byte) 0x68, (byte) 0x61, (byte) 0x43, (byte) 0x64, (byte) 0x73,
         (byte) 0x75, (byte) 0x30, (byte) 0x32, (byte) 0x6f, (byte) 0x00, (byte) 0x19, (byte) 0x00, (byte) 0x04, (byte) 0x11, (byte) 0x00, (byte) 0x00, (byte) 0x00};
@@ -137,7 +138,7 @@ public class StunPacketTest {
         (byte) 0x2b, (byte) 0x0c, (byte) 0x68, (byte) 0x32, (byte) 0x00, (byte) 0x20, (byte) 0x00, (byte) 0x08, (byte) 0x00, (byte) 0x01, (byte) 0x36, (byte) 0x82, (byte) 0xe1, (byte) 0x51, (byte) 0xa0, (byte) 0x50,
         (byte) 0x00, (byte) 0x08, (byte) 0x00, (byte) 0x14, (byte) 0xcc, (byte) 0x73, (byte) 0xf6, (byte) 0x2c, (byte) 0xa2, (byte) 0x96, (byte) 0xd4, (byte) 0xe1, (byte) 0x66, (byte) 0x41, (byte) 0x3f, (byte) 0xb4,
         (byte) 0x44, (byte) 0x6c, (byte) 0xb1, (byte) 0xa3, (byte) 0x61, (byte) 0xcc, (byte) 0x14, (byte) 0x5c, (byte) 0x80, (byte) 0x28, (byte) 0x00, (byte) 0x04, (byte) 0xa7, (byte) 0x0b, (byte) 0x78, (byte) 0x54};
-    
+
     byte[] stunBindingRequest = {
         (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x50, (byte) 0x21, (byte) 0x12, /* r_...P!. */
         (byte) 0xa4, (byte) 0x42, (byte) 0x58, (byte) 0x6e, (byte) 0x61, (byte) 0x31, (byte) 0x45, (byte) 0x4c, /* .BXna1EL */
@@ -152,7 +153,7 @@ public class StunPacketTest {
         (byte) 0x81, (byte) 0xad, (byte) 0x3a, (byte) 0x16, (byte) 0x7e, (byte) 0xe4, (byte) 0xe7, (byte) 0xf2, /* ..:.~... */
         (byte) 0xb9, (byte) 0x25, (byte) 0xa1, (byte) 0x67, (byte) 0xec, (byte) 0xc1, (byte) 0x80, (byte) 0x28, /* .%.g...( */
         (byte) 0x00, (byte) 0x04, (byte) 0x70, (byte) 0xb9, (byte) 0xc6, (byte) 0x36 /* ..p..6 */};
-    
+
     byte[] stunBindingResponse = {
         (byte) 0x01, (byte) 0x01, (byte) 0x00, (byte) 0x58, (byte) 0x21, (byte) 0x12, (byte) 0xa4, (byte) 0x42, (byte) 0x45, (byte) 0x7a, (byte) 0x47, (byte) 0x2f, (byte) 0x7a, (byte) 0x62, (byte) 0x6f, (byte) 0x56, // ...X!..BEzG/zboV
         (byte) 0x2f, (byte) 0x63, (byte) 0x4e, (byte) 0x30, (byte) 0x00, (byte) 0x20, (byte) 0x00, (byte) 0x08, (byte) 0x00, (byte) 0x01, (byte) 0xa3, (byte) 0x91, (byte) 0xe1, (byte) 0x51, (byte) 0xa0, (byte) 0x61, // /cN0. .......Q.a
@@ -163,89 +164,92 @@ public class StunPacketTest {
         (byte) 0xfb, (byte) 0x87, (byte) 0x12, (byte) 0x0b, (byte) 0x80, (byte) 0x28, (byte) 0x00, (byte) 0x04, (byte) 0xe2, (byte) 0x2e, (byte) 0xbe, (byte) 0x5a // .....(.....Z
     };
     
+    InetSocketAddress near = new InetSocketAddress("4.4.4.4", (char) 3323);
+
     @Before
     public void setUp() {
+
     }
-    
+
     @After
     public void tearDown() {
     }
-    
+
     @Test
     public void emptyBinding() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(emptyBindingRequest, null);
+        StunPacket s = StunPacket.mkStunPacket(emptyBindingRequest, null,near);
         assert (s instanceof StunBindingRequest);
     }
-    
+
     @Test
     public void stunResponse() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(pureStunResponse, null);
+        StunPacket s = StunPacket.mkStunPacket(pureStunResponse, null,near);
         assert (s instanceof StunBindingResponse);
     }
-    
+
     @Test
     public void testTurnReq() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(this.turnRequest, null);
+        StunPacket s = StunPacket.mkStunPacket(this.turnRequest, null,near);
         assert (s instanceof StunPacket);
     }
-    
+
     @Test
     public void testTurnChallenge() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(this.turnResponseChallenge, null);
+        StunPacket s = StunPacket.mkStunPacket(this.turnResponseChallenge, null,near);
         assert (s instanceof StunPacket);
     }
-    
+
     @Test
     public void testTurnReqRedux() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(this.turnReqRedux, passwords);
+        StunPacket s = StunPacket.mkStunPacket(this.turnReqRedux, passwords,near);
         assert (s instanceof StunPacket);
     }
-    
+
     @Test
     public void testTurnReqOk() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(this.turnReqOk, null);
+        StunPacket s = StunPacket.mkStunPacket(this.turnReqOk, null,near);
         assert (s instanceof StunPacket);
     }
-    
+
     @Test
     public void testTurnPerm() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(this.turnReqPerm, passwords);
+        StunPacket s = StunPacket.mkStunPacket(this.turnReqPerm, passwords,near);
         assert (s instanceof StunPacket);
     }
-    
+
     @Test
     public void testTurnAllocOk() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(this.turnAllocOk, null);
+        StunPacket s = StunPacket.mkStunPacket(this.turnAllocOk, null,near);
         assert (s instanceof StunPacket);
     }
-    
+
     @Test
     public void testPacket() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(stunBindingRequest, passwords);
+        StunPacket s = StunPacket.mkStunPacket(stunBindingRequest, passwords,near);
         assert (s instanceof StunBindingRequest);
     }
-    
+
     @Test
     public void testMI() {
         Exception rez = new java.lang.Exception();
-        
+
         try {
-            StunPacket s = StunPacket.mkStunPacket(stunBindingResponse, passwords);
+            StunPacket s = StunPacket.mkStunPacket(stunBindingResponse, passwords,near);
         } catch (Exception x) {
             rez = x;
         }
         assert (rez instanceof StunPacket.MessageIntegrityException);
     }
-    
+
     @Test
     public void testOutbound() throws Exception {
-        StunPacket s = StunPacket.mkStunPacket(stunBindingRequest, passwords);
+        StunPacket s = StunPacket.mkStunPacket(stunBindingRequest, passwords,near);
         assert (s instanceof StunBindingRequest);
         byte[] pass = s.getPass();
         byte[] outb = s.outboundBytes(pass);
         assertArrayEquals("Message bytes should match ", stunBindingRequest, outb);
     }
-    
+
     @Test
     public void testBareRequestBuild() throws Exception {
         Random r = new Random();
@@ -254,10 +258,10 @@ public class StunPacketTest {
         StunPacket s = new StunBindingRequest();
         s.setTid(tid);
         byte[] outb = s.outboundBytes(null);
-        StunPacket rep = StunPacket.mkStunPacket(outb, null);
+        StunPacket rep = StunPacket.mkStunPacket(outb, null,near);
         assert (rep instanceof StunBindingRequest);
     }
-    
+
     @Test
     public void testAuthedRequestBuild() throws Exception {
         Random r = new Random();
@@ -268,41 +272,41 @@ public class StunPacketTest {
         Map.Entry<String, String> up = passwords.entrySet().iterator().next();
         String username = up.getKey();
         String pass = up.getValue();
-        Log.debug("username="+username);
+        Log.debug("username=" + username);
         ArrayList<StunAttribute> attrs = new ArrayList();
 
         StunAttribute a = new StunAttribute("USERNAME");
         a.setString(username);
         attrs.add(a);
-        
+
         a = new StunAttribute("ICE-CONTROLLING");
         byte[] tb = new byte[8];
         r.nextBytes(tb);
         a.setBytes(tb);
         attrs.add(a);
-        
+
         a = new StunAttribute("USE-CANDIDATE");
         attrs.add(a);
-        
+
         a = new StunAttribute("PRIORITY");
         int pri = r.nextInt(Character.MAX_VALUE);
         a.setInt(pri);
         attrs.add(a);
-        
+
         a = new StunAttribute("MESSAGE-INTEGRITY");
         byte[] mi = new byte[20];
         a.setBytes(mi);
         attrs.add(a);
-        
+
         a = new StunAttribute("FINGERPRINT");
         a.setInt(0);
         attrs.add(a);
-        
+
         s.setAttributes(attrs);
-        
+
         byte[] outb = s.outboundBytes(pass.getBytes());
-        StunPacket rep = StunPacket.mkStunPacket(outb, passwords);
+        StunPacket rep = StunPacket.mkStunPacket(outb, passwords,near);
         assert (rep instanceof StunBindingRequest);
     }
-    
+
 }

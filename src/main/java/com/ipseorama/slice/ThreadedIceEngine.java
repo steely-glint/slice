@@ -79,7 +79,7 @@ public class ThreadedIceEngine implements IceEngine {
             Map<String, String> miPass = null;
             byte[] recbuf = new byte[StunPacket.MTU];
             _sock.setSoTimeout(POLL);
-
+            InetSocketAddress near = (InetSocketAddress) _sock.getLocalSocketAddress();
             while (_rcv != null) {
                 try {
                     DatagramPacket dgp = new DatagramPacket(recbuf, 0, recbuf.length);
@@ -90,7 +90,7 @@ public class ThreadedIceEngine implements IceEngine {
                         byte rec[] = new byte[len];
                         System.arraycopy(recbuf, 0, rec, 0, len);
                         // switch on first byte here - stun/dtls/rtp ?
-                        StunPacket rp = StunPacket.mkStunPacket(rec, miPass);
+                        StunPacket rp = StunPacket.mkStunPacket(rec, miPass,near);
                         rp.setFar(far);
                         _trans.receivedPacket(rp);
                         synchronized (_sock) {

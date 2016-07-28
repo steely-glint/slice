@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.ORTC.RTCIceTransport;
 import com.phono.srtplight.Log;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,29 +21,40 @@ import java.util.stream.Collectors;
 public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
 
     long NAPLEN = 1000;
+    private RTCIceTransport transport;
 
     public StunTransactionManager() {
         super();
     }
-    
+
     public void addTransaction(StunTransaction t) {
         this.put(t.getTidHash(), t);
     }
 
-    public void receivedPacket(StunPacket p){
-        Log.debug("recvd stun packet from "+p.getFar());
+    public void receivedPacket(StunPacket p) {
+        Log.debug("recvd stun packet from " + p.getFar());
         Integer tid = Arrays.hashCode(p.getTid());
         StunTransaction t = this.get(tid);
         if (t != null) {
             t.received(p);
         } else {
             Log.verb("no matching transaction");
+            if (getTransport() != null) {
+                StunTransaction trans = getTransport().received(p);
+                if (trans != null) {
+                    this.put(tid, trans);
+                    Log.debug("added new transaction");
+                }
+            }
         }
     }
-    
-    public void removeComplete(){
-        this.values().removeIf((StunTransaction t)-> {return t.isComplete();});
+
+    public void removeComplete() {
+        this.values().removeIf((StunTransaction t) -> {
+            return t.isComplete();
+        });
     }
+
     /**
      *
      * @return the next time an action is due - or now + NAPTIME, whichever is
@@ -67,6 +79,20 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
             return t.buildOutboundPacket();
         }).collect(Collectors.toList());
         return pkts;
+    }
+
+    /**
+     * @return the transport
+     */
+    public RTCIceTransport getTransport() {
+        return transport;
+    }
+
+    /**
+     * @param transport the transport to set
+     */
+    public void setTransport(RTCIceTransport transport) {
+        this.transport = transport;
     }
 
 }

@@ -70,6 +70,7 @@ public class StunPacket {
     byte[] _tid;
     byte[] _pass;
     private InetSocketAddress _far;
+    private InetSocketAddress _near;
 
     public byte[] outboundBytes() throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
         return outboundBytes(_pass);
@@ -163,11 +164,12 @@ public class StunPacket {
     /**
      * inbound constuctor
      */
-    StunPacket(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
+    StunPacket(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity, InetSocketAddress near) {
         this(mtype);
         _attributes = attributes;
         _fingerprint = fingerprint;
         _messageIntegrity = messageIntegrity;
+        _near = near;
     }
 
     /**
@@ -226,7 +228,7 @@ public class StunPacket {
     The idea of these static methods is basically paranoia - no stunpacket object is created untill
     the packet has passed validation checks. It also ensures we can create the correct type.
      */
-    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass) throws Exception {
+    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass,InetSocketAddress near) throws Exception {
         StunPacket ret = null;
         if (inbound.length >= 20) {
             ByteBuffer b_frame = ByteBuffer.wrap(inbound);
@@ -256,16 +258,16 @@ public class StunPacket {
                         validatePacket(attributes, fingerprint, messageIntegrity);
                         switch (mtype) {
                             case 0x0101:
-                                ret = new StunBindingResponse(mtype, fingerprint, attributes, messageIntegrity);
+                                ret = new StunBindingResponse(mtype, fingerprint, attributes, messageIntegrity,near);
                                 break;
                             case 0x0110:
-                                ret = new StunErrorResponse(mtype, fingerprint, attributes, messageIntegrity);
+                                ret = new StunErrorResponse(mtype, fingerprint, attributes, messageIntegrity,near);
                                 break;
                             case 0x0001:
-                                ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity);
+                                ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity,near);
                                 break;
                             default:
-                                ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity);
+                                ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity,near);
                                 break;
                         }
                         if (ret != null) {
@@ -368,6 +370,20 @@ public class StunPacket {
         }
     }
 
+    /**
+     * @return the _near
+     */
+    public InetSocketAddress getNear() {
+        return _near;
+    }
+
+    /**
+     * @param _near the _near to set
+     */
+    public void setNear(InetSocketAddress _near) {
+        this._near = _near;
+    }
+
     static class FingerPrintException extends Exception {
 
         public FingerPrintException() {
@@ -387,63 +403,4 @@ public class StunPacket {
         }
     }
 
-}
-
-class StunErrorResponse extends StunPacket {
-
-    public StunErrorResponse(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
-        super(mtype, fingerprint, attributes, messageIntegrity);
-    }
-
-    public StunErrorResponse() {
-        super((short) 0x0110);
-    }
-}
-
-class StunBindingRequest extends StunPacket {
-
-    public StunBindingRequest(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
-        super(mtype, fingerprint, attributes, messageIntegrity);
-    }
-
-    public StunBindingRequest() {
-        super((short) 0x0001);
-    }
-}
-
-class StunBindingResponse extends StunPacket {
-
-    public StunBindingResponse(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity) {
-        super(mtype, fingerprint, attributes, messageIntegrity);
-    }
-
-    public StunBindingResponse() {
-        super((short) 0x0101);
-    }
-
-    InetSocketAddress getReflex() {
-        InetSocketAddress i = null;
-// prefer to use the xor address - but if it isn't there, use the plain one.
-        try {
-            Object[] iat = _attributes.stream().filter((StunAttribute a) -> {
-                return ((a.getName() != null) && (a.getName().equals("XOR-MAPPED-ADDRESS")));
-            }).toArray();
-            if (iat.length < 1) {
-                Log.warn("no xor-Address attributes in this BindingResponse");
-                iat = _attributes.stream().filter((StunAttribute a) -> {
-                    return ((a.getName() != null) && (a.getName().equals("MAPPED-ADDRESS")));
-                }).toArray();
-            }
-            if (iat.length >= 1) {
-                StunAttribute at = (StunAttribute) iat[0];
-                Log.debug("Address attributes in this BindingResponse " + at.getName());
-                i = (at.getName().equals("XOR-MAPPED-ADDRESS")) ? at.getXorIpAddress(_tid) : at.getIpAddress();
-            } else {
-                Log.warn("no Address attributes in this BindingResponse");
-            }
-        } catch (UnknownHostException ex) {
-            Log.error("Problem getting socket address" + ex);
-        }
-        return i;
-    }
 }

@@ -9,6 +9,9 @@ import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
+import com.ipseorama.slice.stun.StunBindingRequest;
+import com.ipseorama.slice.stun.StunPacket;
+import com.ipseorama.slice.stun.StunTransaction;
 import com.phono.srtplight.Log;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -151,6 +154,19 @@ public class RTCIceTransport {
                 .filter((RTCIceCandidatePair icp) -> { return icp.getState() == RTCIceCandidatePairState.WAITING;})
                 .findFirst();
         return ret.isPresent()?ret.get():null;
+    }
+/**
+ * Received a stun packet that doesn't have a pre-existing transaction 
+ * So we potentially create a new transaction for it.
+ * @param p
+ * @return 
+ */
+    public StunTransaction received(StunPacket p) {
+        StunTransaction ret = null;
+        if (p instanceof StunBindingRequest){
+            // todo someone should check that the name/pass is right - who and how ?
+        }
+        return ret;
     }
     
 }

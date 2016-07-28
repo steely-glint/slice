@@ -45,6 +45,7 @@ public class IceStunBindingTransactionTest {
                     new AbstractMap.SimpleEntry<>("smartphone", "nexus5x"),
                     new AbstractMap.SimpleEntry<>("a88ag", "incorrect")
             ).collect(Collectors.toMap((e) -> e.getKey(), (e) -> e.getValue())));
+
     @BeforeClass
     public static void setUpClass() {
         Log.setLevel(Log.DEBUG);
@@ -71,7 +72,9 @@ public class IceStunBindingTransactionTest {
             System.out.println("buildOutboundPacket");
             String host = "8.8.8.8";
             int port = 12356;
-            InetSocketAddress far = new InetSocketAddress(host,(char)port);
+            InetSocketAddress far = new InetSocketAddress(host, (char) port);
+            InetSocketAddress near = new InetSocketAddress("4.4.4.4", (char) 3323);
+
             int reflexPri = 789;
             RTCIceRole role = RTCIceRole.CONTROLLING;
             long tiebreaker = 123456789;
@@ -83,11 +86,11 @@ public class IceStunBindingTransactionTest {
                     outboundUser);
             StunPacket send = instance.buildOutboundPacket();
             byte[] wire = send.outboundBytes("4vc3fb0dshp2lhs6ekne716q0v".getBytes());
-            StunPacket rcv = StunPacket.mkStunPacket(wire, passwords);
+            StunPacket rcv = StunPacket.mkStunPacket(wire, passwords,near);
             rcv.setFar(far);
             assert (rcv instanceof StunBindingRequest);
         } catch (Exception x) {
-            if (Log.getLevel() >= Log.DEBUG){
+            if (Log.getLevel() >= Log.DEBUG) {
                 x.printStackTrace();
             }
             fail("Exception thrown " + x.getMessage());

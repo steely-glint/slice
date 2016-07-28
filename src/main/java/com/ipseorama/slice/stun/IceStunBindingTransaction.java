@@ -5,9 +5,7 @@
  */
 package com.ipseorama.slice.stun;
 
-import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
-import static com.ipseorama.slice.stun.StunBindingTransaction.MAXTRIES;
 import java.util.ArrayList;
 
 /**
@@ -16,10 +14,10 @@ import java.util.ArrayList;
  */
 public class IceStunBindingTransaction extends StunBindingTransaction {
 
-    private int reflexPri;
-    private RTCIceRole role;
-    private long tiebreaker;
-    private String outboundUser;
+    private final int reflexPri;
+    private final RTCIceRole role;
+    private final long tiebreaker;
+    private final String outboundUser;
 
     public IceStunBindingTransaction(String host, int port,
             int reflexPri,
