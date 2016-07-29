@@ -9,6 +9,7 @@ import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
+import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.stun.StunBindingRequest;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransaction;
@@ -147,26 +148,50 @@ public class RTCIceTransport {
             Log.debug("ignoring incompatiple candidate pair " + r.toString() + " " + l.toString());
         }
     }
-    public RTCIceCandidatePair nextCheck(){
+
+    public RTCIceCandidatePair nextCheck() {
         Optional<RTCIceCandidatePair> ret = candidatePairs.stream()
                 .sorted(ordering)
                 .limit(MAXCHECKS)
-                .filter((RTCIceCandidatePair icp) -> { return icp.getState() == RTCIceCandidatePairState.WAITING;})
+                .filter((RTCIceCandidatePair icp) -> {
+                    return icp.getState() == RTCIceCandidatePairState.WAITING;
+                })
                 .findFirst();
-        return ret.isPresent()?ret.get():null;
+        return ret.isPresent() ? ret.get() : null;
     }
-/**
- * Received a stun packet that doesn't have a pre-existing transaction 
- * So we potentially create a new transaction for it.
- * @param p
- * @return 
- */
-    public StunTransaction received(StunPacket p) {
+
+    /**
+     * Received a stun packet that doesn't have a pre-existing transaction So we
+     * potentially create a new transaction for it.
+     *
+     * @param p
+     * @return
+     */
+    public StunTransaction received(StunPacket p, RTCIceProtocol prot, int ipv) {
         StunTransaction ret = null;
-        if (p instanceof StunBindingRequest){
+        if (p instanceof StunBindingRequest) {
             // todo someone should check that the name/pass is right - who and how ?
+            // check for required attributes.
+            StunBindingRequest sbr = (StunBindingRequest) p;
+            if (sbr.hasRequiredIceAttributes()) {
+                RTCIceCandidatePair inbound = findMatchingPair(sbr, prot,  ipv);
+                // todo create a transaction here.
+            }
         }
         return ret;
     }
-    
+
+    private RTCIceCandidatePair findMatchingPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
+        /*InetSocketAddress near = p.getNear();
+        InetSocketAddress far = p.getFar();*/
+        long pri = p.getPriority();
+        RTCIceCandidate t_near = RTCIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri);
+        RTCIceCandidate t_far = RTCIceCandidate.mkTempCandidate(p.getFar(), prot, ipv, pri);
+
+        Optional<RTCIceCandidatePair> cp = this.candidatePairs.stream().filter((RTCIceCandidatePair icp) -> {
+            return icp.sameEnough(t_near,t_far);
+        }).findAny();
+        return cp.isPresent() ? cp.get() : null;
+    }
+
 }

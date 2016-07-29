@@ -375,7 +375,7 @@ For incoming connectivity checks that pass validation,
         // massive, massive to-do - Implement TURN UDP and TURN TLS
     }
 
-    void setIceEngine(IceEngine tie) {
+    public void setIceEngine(IceEngine tie) {
         _ice = tie;
     }
 }

@@ -38,19 +38,19 @@ class RTCIceCandidatePair {
         return remote;
     }
 
-    public long priority(RTCIceRole localRole){
-        
+    public long priority(RTCIceRole localRole) {
+
         long g;
         long d;
-        
-        if (localRole == RTCIceRole.CONTROLLING){
+
+        if (localRole == RTCIceRole.CONTROLLING) {
             g = local.getPriority();
             d = remote.getPriority();
         } else {
             d = local.getPriority();
             g = remote.getPriority();
         }
-        return (2L<<32)*Math.min(g,d) + 2*Math.max(g,d) + (g>d?1:0);
+        return (2L << 32) * Math.min(g, d) + 2 * Math.max(g, d) + (g > d ? 1 : 0);
     }
 
     /**
@@ -59,13 +59,17 @@ class RTCIceCandidatePair {
     public RTCIceCandidatePairState getState() {
         return state;
     }
-    public void setState(RTCIceCandidatePairState newState){
+
+    public void setState(RTCIceCandidatePairState newState) {
         state = newState;
     }
-    public String toString(){
-        return "CandidatePair is "+this.state.toString().toUpperCase() + "\n\tlocal :"+local.toString()+"\n\tremote :"+remote.toString();
+
+    public String toString() {
+        return "CandidatePair is " + this.state.toString().toUpperCase() + "\n\tlocal :" + local.toString() + "\n\tremote :" + remote.toString();
     }
 
-
+    boolean sameEnough(RTCIceCandidate t_near, RTCIceCandidate t_far) {
+        return getLocal().sameEnough(t_near) && getRemote().sameEnough(t_far);
+    }
 
 }

@@ -223,7 +223,16 @@ public class StunPacket {
         }
         return ret;
     }
-
+    StunAttribute getAttributeByName( String aname) {
+        StunAttribute ret = null;
+        for (StunAttribute a : this._attributes) {
+            if ((a.getName() != null) && (a.getName().equals(aname))) {
+                ret = a;
+                break;
+            }
+        }
+        return ret;
+    }
     /*
     The idea of these static methods is basically paranoia - no stunpacket object is created untill
     the packet has passed validation checks. It also ensures we can create the correct type.
@@ -383,6 +392,7 @@ public class StunPacket {
     public void setNear(InetSocketAddress _near) {
         this._near = _near;
     }
+
 
     static class FingerPrintException extends Exception {
 

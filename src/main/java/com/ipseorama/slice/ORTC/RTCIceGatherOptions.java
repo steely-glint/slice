@@ -12,18 +12,18 @@ import java.util.List;
  *
  * @author tim
  */
-class RTCIceGatherOptions {
+public class RTCIceGatherOptions {
 
     private RTCIceGatherPolicy gatherPolicy;
     private List<RTCIceServer> iceServers;
     final private int _portMax;
     final private int _portMin; // avoid priv ports;
 
-    RTCIceGatherOptions() {
+    public RTCIceGatherOptions() {
         this(1024, Character.MAX_VALUE);
     }
 
-    RTCIceGatherOptions(int portMin, int portMax) {
+    public RTCIceGatherOptions(int portMin, int portMax) {
         _portMax = portMax;
         _portMin = portMin;
     }

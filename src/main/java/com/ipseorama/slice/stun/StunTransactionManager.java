@@ -6,6 +6,7 @@
 package com.ipseorama.slice.stun;
 
 import com.ipseorama.slice.ORTC.RTCIceTransport;
+import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.phono.srtplight.Log;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -31,7 +32,7 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
         this.put(t.getTidHash(), t);
     }
 
-    public void receivedPacket(StunPacket p) {
+    public void receivedPacket(StunPacket p,RTCIceProtocol prot, int ipv) {
         Log.debug("recvd stun packet from " + p.getFar());
         Integer tid = Arrays.hashCode(p.getTid());
         StunTransaction t = this.get(tid);
@@ -40,7 +41,7 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
         } else {
             Log.verb("no matching transaction");
             if (getTransport() != null) {
-                StunTransaction trans = getTransport().received(p);
+                StunTransaction trans = getTransport().received(p,prot,ipv);
                 if (trans != null) {
                     this.put(tid, trans);
                     Log.debug("added new transaction");

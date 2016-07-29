@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice;
 
+import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
@@ -86,13 +87,15 @@ public class ThreadedIceEngine implements IceEngine {
                     try {
                         _sock.receive(dgp);
                         InetSocketAddress far = (InetSocketAddress) dgp.getSocketAddress();
+                        int ipv = far.getAddress() instanceof java.net.Inet4Address ? 4 : 6;
+
                         int len = dgp.getLength();
                         byte rec[] = new byte[len];
                         System.arraycopy(recbuf, 0, rec, 0, len);
                         // switch on first byte here - stun/dtls/rtp ?
-                        StunPacket rp = StunPacket.mkStunPacket(rec, miPass,near);
+                        StunPacket rp = StunPacket.mkStunPacket(rec, miPass, near);
                         rp.setFar(far);
-                        _trans.receivedPacket(rp);
+                        _trans.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
                         synchronized (_sock) {
                             // tell our friend that we may have some work for them.
                             _sock.notifyAll();

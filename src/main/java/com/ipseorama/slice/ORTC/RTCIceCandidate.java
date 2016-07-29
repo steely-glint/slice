@@ -11,6 +11,7 @@ import com.ipseorama.slice.ORTC.enums.RTCIceCandidateType;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.phono.srtplight.Log;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 
 /**
  *
@@ -30,6 +31,19 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     private int generation;
     private int ipVersion = 6;
 
+    static RTCIceCandidate mkTempCandidate(InetSocketAddress isoc, RTCIceProtocol prot, int ipversion, long pri) {
+        InetAddress home = isoc.getAddress();
+        String found = RTCIceCandidate.calcFoundation(RTCIceCandidateType.PRFLX, home, null, prot);
+        RTCIceCandidate cand = new RTCIceCandidate(found,
+                pri,
+                home.getHostAddress(),
+                RTCIceProtocol.UDP,
+                (char) isoc.getPort(),
+                RTCIceCandidateType.HOST,
+                null);
+        cand.setIpVersion(ipversion);
+        return cand;
+    }
 
     /*String              relatedAddress;
              char         relatedPort;*/
@@ -230,7 +244,6 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
    fall back to 6to4 addresses when communicating with agents in other
    sites that do not yet have native v6 connectivity.
      */
-
     static int calcPriority(RTCIceCandidateType ctype, char localpref, RTCIceComponent comp) {
         int ctv = 0;
         switch (ctype) {
@@ -253,6 +266,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
         return priority;
 
     }
+
     /*
     4.1.1.3.  Computing Foundations
 
@@ -276,17 +290,23 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
    STUN or TURN servers used to obtain them have different IP addresses,
    or their transport protocols are different.
 
-    */
-    static String calcFoundation(RTCIceCandidateType ctype,InetAddress base, InetAddress svr, RTCIceProtocol protocol ){
-       String thing=ctype.name() + base.getHostAddress()+(svr==null ? "0.0.0.0":svr.getHostAddress())+protocol.name();
+     */
+    static String calcFoundation(RTCIceCandidateType ctype, InetAddress base, InetAddress svr, RTCIceProtocol protocol) {
+        String thing = ctype.name() + base.getHostAddress() + (svr == null ? "0.0.0.0" : svr.getHostAddress()) + protocol.name();
         String ret = Integer.toUnsignedString(thing.hashCode());
         return ret;
     }
-    int getIpVersion(){
+
+    int getIpVersion() {
         return ipVersion;
     }
-    
-    public void setIpVersion(int v){
+
+    public void setIpVersion(int v) {
         ipVersion = v;
+    }
+
+    boolean sameSocketAddress(InetSocketAddress sa) {
+        boolean ret = this.getIp().equals(sa.getAddress()) && this.getPort() == sa.getPort();
+        return ret;
     }
 }

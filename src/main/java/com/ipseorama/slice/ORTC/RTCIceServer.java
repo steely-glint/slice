@@ -13,7 +13,7 @@ import java.util.List;
  *
  * @author tim
  */
-class RTCIceServer {
+public class RTCIceServer {
 
     public final List<URI> urls;
     public final String username;
