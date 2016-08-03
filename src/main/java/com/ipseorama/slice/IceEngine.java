@@ -13,7 +13,12 @@ import java.net.DatagramSocket;
  * @author thp
  */
 public interface IceEngine {
-        public void start(DatagramSocket ds, StunTransactionManager tm) ;
+
+    public void start(DatagramSocket ds, StunTransactionManager tm);
 
     public boolean isStarted();
+
+    public void addIceCreds(String user, String pass);
+    public StunTransactionManager getTransactionManager() ;
+
 }

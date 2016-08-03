@@ -12,8 +12,8 @@ import java.util.ArrayList;
 
 public class StunBindingResponse extends StunPacket {
 
-    public StunBindingResponse(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity,InetSocketAddress near) {
-        super(mtype, fingerprint, attributes, messageIntegrity,near);
+    public StunBindingResponse(short mtype, Integer fingerprint, ArrayList<StunAttribute> attributes, byte[] messageIntegrity, InetSocketAddress near) {
+        super(mtype, fingerprint, attributes, messageIntegrity, near);
     }
 
     public StunBindingResponse() {
@@ -45,5 +45,29 @@ public class StunBindingResponse extends StunPacket {
         }
         return i;
     }
-}
 
+    void setRequiredAttributes(InetSocketAddress far, String ufrags) {
+
+        Log.debug("response username=" + ufrags);
+        ArrayList<StunAttribute> attrs = new ArrayList();
+
+        StunAttribute a = new StunAttribute("USERNAME");
+        a.setString(ufrags);
+        attrs.add(a);
+
+        a = new StunAttribute("XOR-MAPPED-ADDRESS");
+        a.setXorIpAddress(far);
+        attrs.add(a);
+
+        a = new StunAttribute("MESSAGE-INTEGRITY");
+        byte[] mi = new byte[20];
+        a.setBytes(mi);
+        attrs.add(a);
+
+        a = new StunAttribute("FINGERPRINT");
+        a.setInt(0);
+        attrs.add(a);
+
+        this.setAttributes(attrs);
+    }
+}

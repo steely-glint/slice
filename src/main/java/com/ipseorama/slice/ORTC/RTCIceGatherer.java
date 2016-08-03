@@ -58,6 +58,7 @@ For incoming connectivity checks that pass validation,
     ArrayList<RTCIceCandidate> _localCandidates;
     IceEngine _ice;
     private final StunTransactionManager _stm;
+    private RTCIceParameters _localParams;
 
     public RTCIceGatherer() {
         _localCandidates = new ArrayList();
@@ -71,7 +72,7 @@ For incoming connectivity checks that pass validation,
     }
     private RTCIceGathererState _state;
 
-    RTCIceGathererState getState() {
+    public RTCIceGathererState getState() {
         return _state;
     }
 
@@ -199,7 +200,7 @@ For incoming connectivity checks that pass validation,
         RTCIceGatherPolicy policy = options.getGatherPolicy();
         List<RTCIceServer> servers = options.getIceServers();
         if ((_ice != null) && (!_ice.isStarted())) {
-            _ice.start(_sock, _stm);
+            _ice.start(_sock, _stm);            
         }
         switch (policy) {
             case NOHOST:
@@ -218,9 +219,13 @@ For incoming connectivity checks that pass validation,
     }
 
     public RTCIceParameters getLocalParameters() {
-        return null;
+        return _localParams;
     }
 
+    public void setLocalParameters(RTCIceParameters local){
+        _localParams = local;
+    }
+    
     List<RTCIceCandidate> getLocalCandidates() {
         return _localCandidates;
     }
@@ -377,5 +382,12 @@ For incoming connectivity checks that pass validation,
 
     public void setIceEngine(IceEngine tie) {
         _ice = tie;
+    }
+    public IceEngine getIceEngine(){
+        return _ice;
+    }
+
+    StunTransactionManager getStunTransactionManager() {
+        return _stm;
     }
 }

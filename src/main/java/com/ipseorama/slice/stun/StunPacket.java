@@ -71,7 +71,11 @@ public class StunPacket {
     byte[] _pass;
     private InetSocketAddress _far;
     private InetSocketAddress _near;
-
+    
+    public byte[] outboundBytes(Map<String, String> miPass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
+        byte[] pass = StunPacket.findPass(_attributes, miPass);
+        return outboundBytes(pass);
+    }
     public byte[] outboundBytes() throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
         return outboundBytes(_pass);
     }
@@ -121,7 +125,7 @@ public class StunPacket {
             ByteBuffer vbb = ByteBuffer.wrap(val);
             StunAttribute a = new StunAttribute(new Integer(a_type), a_len, vbb);
             buf.add(a);
-            Log.debug("Attribute type " + a.getName() + "(" + a_type + ") " + " len " + a_len + " at " + startpos);
+            Log.debug("Attribute type " + a.getName() + "(" + (int) a_type + ") " + " len " + a_len + " at " + startpos);
             // now suckup any pad 
             int pad = a_len % 4;
             if (pad != 0) {
@@ -223,7 +227,8 @@ public class StunPacket {
         }
         return ret;
     }
-    StunAttribute getAttributeByName( String aname) {
+
+    StunAttribute getAttributeByName(String aname) {
         StunAttribute ret = null;
         for (StunAttribute a : this._attributes) {
             if ((a.getName() != null) && (a.getName().equals(aname))) {
@@ -233,11 +238,12 @@ public class StunPacket {
         }
         return ret;
     }
+
     /*
     The idea of these static methods is basically paranoia - no stunpacket object is created untill
     the packet has passed validation checks. It also ensures we can create the correct type.
      */
-    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass,InetSocketAddress near) throws Exception {
+    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near) throws Exception {
         StunPacket ret = null;
         if (inbound.length >= 20) {
             ByteBuffer b_frame = ByteBuffer.wrap(inbound);
@@ -267,16 +273,16 @@ public class StunPacket {
                         validatePacket(attributes, fingerprint, messageIntegrity);
                         switch (mtype) {
                             case 0x0101:
-                                ret = new StunBindingResponse(mtype, fingerprint, attributes, messageIntegrity,near);
+                                ret = new StunBindingResponse(mtype, fingerprint, attributes, messageIntegrity, near);
                                 break;
                             case 0x0110:
-                                ret = new StunErrorResponse(mtype, fingerprint, attributes, messageIntegrity,near);
+                                ret = new StunErrorResponse(mtype, fingerprint, attributes, messageIntegrity, near);
                                 break;
                             case 0x0001:
-                                ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity,near);
+                                ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity, near);
                                 break;
                             default:
-                                ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity,near);
+                                ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity, near);
                                 break;
                         }
                         if (ret != null) {
@@ -392,6 +398,7 @@ public class StunPacket {
     public void setNear(InetSocketAddress _near) {
         this._near = _near;
     }
+
 
 
     static class FingerPrintException extends Exception {

@@ -20,16 +20,25 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     final static int TIMEOUT = 200; // a stun server that responds in > 1sec isn't of intrest.
     final static int MAXTRIES = 4;
     protected InetSocketAddress _ref;
+    StunBindingRequest inbound = null;
 
     public StunBindingTransaction(String host, int port) {
+        super();
         _far = new InetSocketAddress(host, port);
         dueTime = System.currentTimeMillis();
     }
 
-    public InetSocketAddress getFar(){
+    public StunBindingTransaction(StunBindingRequest sbreq) {
+        super(sbreq);
+        _far = sbreq.getFar();
+        inbound = sbreq;
+        dueTime = System.currentTimeMillis() - 10;
+    }
+
+    public InetSocketAddress getFar() {
         return _far;
     }
-    
+
     @Override
     public void received(StunPacket r) {
         if (r instanceof StunBindingResponse) {
@@ -47,18 +56,26 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     @Override
     public StunPacket buildOutboundPacket() {
         StunPacket bind = null;
-        if (retries > MAXTRIES) {
-            RTCTimeoutEvent e = new RTCTimeoutEvent();
-            complete = true;
-            if (oncomplete != null) {
-                oncomplete.onEvent(e);
+        if (inbound == null) { // near is the requestor...
+            if (retries > MAXTRIES) {
+                RTCTimeoutEvent e = new RTCTimeoutEvent();
+                complete = true;
+                if (oncomplete != null) {
+                    oncomplete.onEvent(e);
+                }
+            } else {
+                bind = new StunBindingRequest();
+                dueTime = System.currentTimeMillis() + (TIMEOUT * retries++);
             }
         } else {
-            bind = new StunBindingRequest();
-            bind.setTid(this.getTid());
-            bind.setFar(_far);
-            
-            dueTime = System.currentTimeMillis() + (TIMEOUT * retries++);
+            // someone sent us a request.
+            StunBindingResponse rbind = new StunBindingResponse();
+            rbind.setTid(this.getTid());
+            rbind.setFar(_far);
+            String ufrags = inbound.getUserName();
+            rbind.setRequiredAttributes(_far, ufrags);
+            bind = rbind;
+            complete = true; // oneshot. but no one cares...
         }
         return bind;
     }
@@ -70,5 +87,4 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
         return _ref;
     }
 
-    
 }

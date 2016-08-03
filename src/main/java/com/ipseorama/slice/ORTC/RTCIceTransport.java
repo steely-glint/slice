@@ -5,14 +5,17 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.stun.StunBindingRequest;
+import com.ipseorama.slice.stun.StunBindingTransaction;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransaction;
+import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -51,6 +54,13 @@ public class RTCIceTransport {
     public void start(RTCIceGatherer gatherer, RTCIceParameters remoteParameters, RTCIceRole role) {
         // for the moment we will ignore the new values and assume that the constructor was right....
         // and ignore the re-start semantics.
+        IceEngine ice = gatherer.getIceEngine();
+        StunTransactionManager tm = gatherer.getStunTransactionManager();
+        tm.setTransport(this);
+        final EventHandler oldAct = gatherer.onlocalcandidate;
+        if (remoteParameters != null) {
+            this.remoteParameters = remoteParameters;
+        }
         gatherer.onlocalcandidate = (RTCEventData c) -> {
             if (c instanceof RTCIceCandidate) {
                 RTCIceCandidate l = (RTCIceCandidate) c;
@@ -58,6 +68,9 @@ public class RTCIceTransport {
                 for (RTCIceCandidate r : remotes) {
                     addPair(l, r);
                 }
+            }
+            if (oldAct != null) {
+                oldAct.onEvent(c);
             }
         };
 
@@ -94,8 +107,8 @@ public class RTCIceTransport {
         // assume all candidates are added vi addRemoteCandidate ;-)
     }
 
-    EventHandler onstatechange;
-    EventHandler oncandidatepairchange;
+    public EventHandler onstatechange;
+    public EventHandler oncandidatepairchange;
 
     public RTCIceTransport(RTCIceGatherer ig,
             RTCIceRole r,
@@ -172,10 +185,19 @@ public class RTCIceTransport {
         if (p instanceof StunBindingRequest) {
             // todo someone should check that the name/pass is right - who and how ?
             // check for required attributes.
+
             StunBindingRequest sbr = (StunBindingRequest) p;
+
             if (sbr.hasRequiredIceAttributes()) {
-                RTCIceCandidatePair inbound = findMatchingPair(sbr, prot,  ipv);
-                // todo create a transaction here.
+                if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
+                    RTCIceCandidatePair inbound = findMatchingPair(sbr, prot, ipv);
+                    if (inbound != null) {
+                        // create one ???   
+                    }
+                    ret = new StunBindingTransaction(sbr);
+                } else {
+                    Log.verb("Ignored bining transaction - wrong user");
+                }
             }
         }
         return ret;
@@ -189,7 +211,7 @@ public class RTCIceTransport {
         RTCIceCandidate t_far = RTCIceCandidate.mkTempCandidate(p.getFar(), prot, ipv, pri);
 
         Optional<RTCIceCandidatePair> cp = this.candidatePairs.stream().filter((RTCIceCandidatePair icp) -> {
-            return icp.sameEnough(t_near,t_far);
+            return icp.sameEnough(t_near, t_far);
         }).findAny();
         return cp.isPresent() ? cp.get() : null;
     }

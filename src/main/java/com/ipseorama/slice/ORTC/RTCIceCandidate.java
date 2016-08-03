@@ -47,7 +47,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
 
     /*String              relatedAddress;
              char         relatedPort;*/
-    RTCIceCandidate(String foundation,
+    public RTCIceCandidate(String foundation,
             long priority,
             String ip,
             RTCIceProtocol protocol,

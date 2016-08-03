@@ -257,7 +257,7 @@ public class StunPacketTest {
         r.nextBytes(tid);
         StunPacket s = new StunBindingRequest();
         s.setTid(tid);
-        byte[] outb = s.outboundBytes(null);
+        byte[] outb = s.outboundBytes((byte[])null);
         StunPacket rep = StunPacket.mkStunPacket(outb, null,near);
         assert (rep instanceof StunBindingRequest);
     }

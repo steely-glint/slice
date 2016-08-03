@@ -15,6 +15,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +34,8 @@ public class ThreadedIceEngine implements IceEngine {
     private Thread _rcv;
     private boolean _started = false;
     static int POLL = 1000;
+    static int Ta = 10;
+    private Map<String, String> miPass = new HashMap();
 
     public synchronized void start(DatagramSocket ds, StunTransactionManager tm) {
         if (_started) {
@@ -59,6 +62,11 @@ public class ThreadedIceEngine implements IceEngine {
 
     }
 
+    @Override
+    public void addIceCreds(String user, String pass) {
+        miPass.put(user, pass);
+    }
+/*
     void tick() {
         long now = System.currentTimeMillis();
         List<StunPacket> rs = _trans.transact(now);
@@ -74,10 +82,9 @@ public class ThreadedIceEngine implements IceEngine {
         }
 
     }
-
+*/
     private void rcvloop() {
         try {
-            Map<String, String> miPass = null;
             byte[] recbuf = new byte[StunPacket.MTU];
             _sock.setSoTimeout(POLL);
             InetSocketAddress near = (InetSocketAddress) _sock.getLocalSocketAddress();
@@ -95,10 +102,10 @@ public class ThreadedIceEngine implements IceEngine {
                         // switch on first byte here - stun/dtls/rtp ?
                         StunPacket rp = StunPacket.mkStunPacket(rec, miPass, near);
                         rp.setFar(far);
-                        _trans.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
-                        synchronized (_sock) {
+                        synchronized (_trans) {
+                            _trans.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
                             // tell our friend that we may have some work for them.
-                            _sock.notifyAll();
+                            _trans.notifyAll();
                         }
                     } catch (SocketTimeoutException t) {
                         ;// don't care
@@ -118,22 +125,27 @@ public class ThreadedIceEngine implements IceEngine {
         while (_rcv != null) {
             try {
                 long now = System.currentTimeMillis();
-                List<StunPacket> tos = _trans.transact(now);
+                List<StunPacket> tos = null;
+                synchronized (_trans) {
+                     tos = _trans.transact(now);
+                }
                 for (StunPacket sp : tos) {
-                    byte o[] = sp.outboundBytes();
+                    byte o[] = sp.outboundBytes(miPass);
                     InetSocketAddress far = sp.getFar();
                     if (far != null) {
                         Log.verb("sending packet length " + o.length + "  to " + far);
                         DatagramPacket out = new DatagramPacket(o, 0, o.length, far);
                         _sock.send(out);
+                        // rate limit this here....
+                        Thread.sleep(Ta);
                     } else {
                         Log.verb("not sending packet to unresolved address");
                     }
                 }
-                long next = _trans.nextDue();
-                int snooze = (int) (next - now);
-                synchronized (_sock) {
-                    _sock.wait(snooze);
+                synchronized (_trans) {
+                    long next = _trans.nextDue();
+                    int snooze = (int) (next - now);
+                    _trans.wait(snooze);
                 }
             } catch (Exception x) {
                 Log.error("Exception in loop" + x.getMessage());
@@ -148,6 +160,11 @@ public class ThreadedIceEngine implements IceEngine {
     @Override
     public boolean isStarted() {
         return _started;
+    }
+
+    @Override
+    public StunTransactionManager getTransactionManager() {
+        return this._trans;
     }
 
 }

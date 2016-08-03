@@ -32,7 +32,7 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
         this.put(t.getTidHash(), t);
     }
 
-    public void receivedPacket(StunPacket p,RTCIceProtocol prot, int ipv) {
+    public void receivedPacket(StunPacket p, RTCIceProtocol prot, int ipv) {
         Log.debug("recvd stun packet from " + p.getFar());
         Integer tid = Arrays.hashCode(p.getTid());
         StunTransaction t = this.get(tid);
@@ -41,16 +41,20 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
         } else {
             Log.verb("no matching transaction");
             if (getTransport() != null) {
-                StunTransaction trans = getTransport().received(p,prot,ipv);
+                StunTransaction trans = getTransport().received(p, prot, ipv);
                 if (trans != null) {
                     this.put(tid, trans);
                     Log.debug("added new transaction");
+                } else {
+                    Log.verb("didn't make transaction");
                 }
+            } else {
+                Log.verb("no matching transport");
             }
         }
     }
 
-    public void removeComplete() {
+    synchronized public void removeComplete() {
         this.values().removeIf((StunTransaction t) -> {
             return t.isComplete();
         });
