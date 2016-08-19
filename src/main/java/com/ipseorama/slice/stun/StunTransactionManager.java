@@ -8,8 +8,8 @@ package com.ipseorama.slice.stun;
 import com.ipseorama.slice.ORTC.RTCIceTransport;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.phono.srtplight.Log;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,32 +19,61 @@ import java.util.stream.Collectors;
  * @author thp This class manages a list of transactions - it extends HashMap
  * and adds convenience methods
  */
-public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
+public class StunTransactionManager {
 
     long NAPLEN = 1000;
     private RTCIceTransport transport;
+    private ArrayList<StunTransaction> values;
 
     public StunTransactionManager() {
-        super();
+        values = new ArrayList();
     }
 
     public void addTransaction(StunTransaction t) {
-        this.put(t.getTidHash(), t);
+        values.add(t);
+    }
+
+    synchronized StunTransaction get(byte[] tid) {
+        StunTransaction t = values.stream().filter(
+                (StunTransaction tt) -> {
+                    boolean found = Arrays.equals(tid, tt.id);
+                    Log.verb("" + found + " matching " + StunPacket.hexString(tt.id));
+                    return found;
+                }).findAny().orElse(null);
+        return t;
+    }
+
+    IceStunBindingTransaction getIceBindingTrans(byte[] tid) {
+        Log.verb("incomming packet with tid " + StunPacket.hexString(tid));
+        IceStunBindingTransaction ret = null;
+        StunTransaction t = get(tid);
+        if (t != null) {
+            Log.verb("found matching " + t.getClass().getSimpleName() + " for tid " + StunPacket.hexString(tid));
+        } else {
+            Log.verb("no matching transaction for tid " + StunPacket.hexString(tid));
+        }
+        if (t instanceof IceStunBindingTransaction) {
+            ret = (IceStunBindingTransaction) t;
+        } else {
+            Log.verb("not an IceStunBindingTransaction for tid " + StunPacket.hexString(tid));
+        }
+        return ret;
     }
 
     public void receivedPacket(StunPacket p, RTCIceProtocol prot, int ipv) {
         Log.debug("recvd stun packet from " + p.getFar());
-        Integer tid = Arrays.hashCode(p.getTid());
-        StunTransaction t = this.get(tid);
+        StunTransaction t = this.get(p.getTid());
         if (t != null) {
             t.received(p);
         } else {
             Log.verb("no matching transaction");
             if (getTransport() != null) {
-                StunTransaction trans = getTransport().received(p, prot, ipv);
+                List<StunTransaction> trans = getTransport().received(p, prot, ipv);
                 if (trans != null) {
-                    this.put(tid, trans);
-                    Log.debug("added new transaction");
+                    for (StunTransaction tr : trans) {
+                        values.add(tr);
+                        Log.debug("added new transaction" + tr.toString());
+                    }
                 } else {
                     Log.verb("didn't make transaction");
                 }
@@ -55,7 +84,7 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
     }
 
     synchronized public void removeComplete() {
-        this.values().removeIf((StunTransaction t) -> {
+        values.removeIf((StunTransaction t) -> {
             return t.isComplete();
         });
     }
@@ -66,7 +95,7 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
      * sooner
      */
     public long nextDue() {
-        Iterator<StunTransaction> it = this.values().iterator();
+        Iterator<StunTransaction> it = values.iterator();
         long ret = System.currentTimeMillis() + NAPLEN;
         while (it.hasNext()) {
             StunTransaction t = it.next();
@@ -77,10 +106,11 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
         return ret;
     }
 
-    public List<StunPacket> transact(long now) {
-        List<StunPacket> pkts = this.values().stream().filter((StunTransaction t) -> {
-            return !t.isComplete() && t.getDueTime() <= now;
+    synchronized public List<StunPacket> transact(long now) {
+        List<StunPacket> pkts = values.stream().filter((StunTransaction t) -> {
+            return (t != null) && !t.isComplete() && t.getDueTime() <= now;
         }).map((StunTransaction t) -> {
+            Log.debug("Building packet for " + t.toString());
             return t.buildOutboundPacket();
         }).collect(Collectors.toList());
         return pkts;
@@ -98,6 +128,10 @@ public class StunTransactionManager extends HashMap<Integer, StunTransaction> {
      */
     public void setTransport(RTCIceTransport transport) {
         this.transport = transport;
+    }
+
+    public int size() {
+        return values.size();
     }
 
 }

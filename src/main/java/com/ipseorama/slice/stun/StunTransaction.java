@@ -20,6 +20,7 @@ public abstract class StunTransaction {
     long dueTime;
     int retries;
     boolean complete;
+    String cause = "unknown";
     SecureRandom r = new SecureRandom();
     
     /**
@@ -73,4 +74,12 @@ public abstract class StunTransaction {
     public long getDueTime(){
         return dueTime;
     }
+    public void setCause(String c){
+        cause = c;
+    }
+    public String toString(){
+        return "{"+cause+"} stun Transaction type "+this.getClass().getSimpleName()+" complete="+this.isComplete()+ "tid ="+ StunPacket.hexString(id);
+    }
+
+
 }

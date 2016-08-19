@@ -17,6 +17,7 @@ import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransaction;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -38,6 +39,7 @@ public class RTCIceTransport {
     List<RTCIceCandidatePair> candidatePairs;
 
     private final Comparator<RTCIceCandidatePair> ordering;
+    private long tieBreaker;
 
     public RTCIceTransportState getRTCIceTransportState() {
         return state;
@@ -55,6 +57,7 @@ public class RTCIceTransport {
         // for the moment we will ignore the new values and assume that the constructor was right....
         // and ignore the re-start semantics.
         IceEngine ice = gatherer.getIceEngine();
+
         StunTransactionManager tm = gatherer.getStunTransactionManager();
         tm.setTransport(this);
         final EventHandler oldAct = gatherer.onlocalcandidate;
@@ -81,6 +84,10 @@ public class RTCIceTransport {
 
     public RTCIceParameters getRemoteParameters() {
         return remoteParameters;
+    }
+
+    public RTCIceParameters getLocalParameters() {
+        return this.iceGatherer.getLocalParameters();
     }
 
     RTCIceTransport createAssociatedTransport() {
@@ -114,6 +121,8 @@ public class RTCIceTransport {
             RTCIceRole r,
             RTCIceComponent comp) {
         this.iceGatherer = ig;
+        SecureRandom rand = new SecureRandom();
+        this.tieBreaker = rand.nextLong();
         this.role = r;
         this.component = comp;
         this.state = RTCIceTransportState.NEW;
@@ -180,8 +189,8 @@ public class RTCIceTransport {
      * @param p
      * @return
      */
-    public StunTransaction received(StunPacket p, RTCIceProtocol prot, int ipv) {
-        StunTransaction ret = null;
+    public List<StunTransaction> received(StunPacket p, RTCIceProtocol prot, int ipv) {
+        List<StunTransaction> ret = null;
         if (p instanceof StunBindingRequest) {
             // todo someone should check that the name/pass is right - who and how ?
             // check for required attributes.
@@ -189,12 +198,21 @@ public class RTCIceTransport {
             StunBindingRequest sbr = (StunBindingRequest) p;
 
             if (sbr.hasRequiredIceAttributes()) {
+                ret = new ArrayList();
                 if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
                     RTCIceCandidatePair inbound = findMatchingPair(sbr, prot, ipv);
-                    if (inbound != null) {
-                        // create one ???   
+                    if (inbound == null) {
+                        inbound = mkPair(sbr, prot, ipv);
+                        Log.verb("create pair "+inbound.toString()+" ipv"+ipv);
                     }
-                    ret = new StunBindingTransaction(sbr);
+                    StunBindingTransaction replyTrans = new StunBindingTransaction(sbr);
+                    replyTrans.setCause("inbound");
+                    Log.verb("adding " + replyTrans.toString() + " to do reply");
+                    ret.add(replyTrans);
+                    StunTransaction triggeredTrans = inbound.trigger(this);
+                    Log.verb("adding new Rtans " + triggeredTrans.toString() + " for trigger");
+                    ret.add(triggeredTrans);
+
                 } else {
                     Log.verb("Ignored bining transaction - wrong user");
                 }
@@ -214,6 +232,34 @@ public class RTCIceTransport {
             return icp.sameEnough(t_near, t_far);
         }).findAny();
         return cp.isPresent() ? cp.get() : null;
+    }
+
+    private RTCIceCandidatePair mkPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
+        long pri = p.getPriority();
+        RTCIceCandidate t_near = RTCIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri);
+        RTCIceCandidate t_far = RTCIceCandidate.mkTempCandidate(p.getFar(), prot, ipv, pri);
+        Optional<RTCIceCandidate> fopt = this.remoteCandidates.stream().filter((RTCIceCandidate r) -> {
+            return r.sameEnough(t_far);
+        }).findAny();
+        RTCIceCandidate far = fopt.orElse(t_far);
+        Optional<RTCIceCandidate> nopt = this.remoteCandidates.stream().filter((RTCIceCandidate r) -> {
+            return r.sameEnough(t_far);
+        }).findAny();
+        RTCIceCandidate near = nopt.orElse(t_near);
+        RTCIceCandidatePair ret = new RTCIceCandidatePair(far, near);
+        candidatePairs.add(ret);
+        return ret;
+    }
+
+    RTCIceRole getRole() {
+        return this.role;
+    }
+
+    /**
+     * @return the tieBreaker
+     */
+    public long getTieBreaker() {
+        return tieBreaker;
     }
 
 }

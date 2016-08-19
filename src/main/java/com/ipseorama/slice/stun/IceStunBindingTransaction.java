@@ -53,4 +53,8 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         bind.setAttributes(attrs);
     }
 
+    String getUserName() {
+        return outboundUser;
+    }
+
 }

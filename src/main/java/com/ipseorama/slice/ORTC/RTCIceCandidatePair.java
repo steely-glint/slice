@@ -7,6 +7,8 @@ package com.ipseorama.slice.ORTC;
 
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
+import com.ipseorama.slice.stun.IceStunBindingTransaction;
+import com.ipseorama.slice.stun.StunTransaction;
 
 /**
  *
@@ -70,6 +72,24 @@ class RTCIceCandidatePair {
 
     boolean sameEnough(RTCIceCandidate t_near, RTCIceCandidate t_far) {
         return getLocal().sameEnough(t_near) && getRemote().sameEnough(t_far);
+    }
+
+    StunTransaction trigger(RTCIceTransport trans) {
+        String host = this.remote.getIp();
+        int port = (int) this.remote.getPort();
+        RTCIceRole role = trans.getRole();
+        long reflexPri = priority(role);
+
+        long tiebreaker = trans.getTieBreaker();
+        String outboundUser = trans.getRemoteParameters().usernameFragment +":"+trans.getLocalParameters().usernameFragment;
+
+        IceStunBindingTransaction ret = new IceStunBindingTransaction(host, port,
+                (int) reflexPri,
+                role,
+                tiebreaker,
+                outboundUser);
+        ret.setCause("outbound triggered");
+        return ret;
     }
 
 }

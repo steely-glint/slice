@@ -51,12 +51,12 @@ public class ThreadedIceEngine implements IceEngine {
 
             rcvloop();
         };
-        _rcv = new Thread(ior, "ice-rcv" + _sock.toString());
+        _rcv = new Thread(ior, "ice-rcvr --<<--");
         _rcv.start();
         Runnable ios = () -> {
             sendloop();
         };
-        _send = new Thread(ios, "ice-send" + _sock.toString());
+        _send = new Thread(ios, "ice-send -->>--");
         _send.start();
         _started = true;
 
@@ -66,7 +66,8 @@ public class ThreadedIceEngine implements IceEngine {
     public void addIceCreds(String user, String pass) {
         miPass.put(user, pass);
     }
-/*
+
+    /*
     void tick() {
         long now = System.currentTimeMillis();
         List<StunPacket> rs = _trans.transact(now);
@@ -82,7 +83,7 @@ public class ThreadedIceEngine implements IceEngine {
         }
 
     }
-*/
+     */
     private void rcvloop() {
         try {
             byte[] recbuf = new byte[StunPacket.MTU];
@@ -100,12 +101,33 @@ public class ThreadedIceEngine implements IceEngine {
                         byte rec[] = new byte[len];
                         System.arraycopy(recbuf, 0, rec, 0, len);
                         // switch on first byte here - stun/dtls/rtp ?
-                        StunPacket rp = StunPacket.mkStunPacket(rec, miPass, near);
-                        rp.setFar(far);
-                        synchronized (_trans) {
-                            _trans.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
-                            // tell our friend that we may have some work for them.
-                            _trans.notifyAll();
+                        /*
+                        
+                   +----------------+
+                   | 127 < B < 192 -+--> forward to RTP
+                   |                |
+       packet -->  |  19 < B < 64  -+--> forward to DTLS
+                   |                |
+                   |       B < 2   -+--> forward to STUN
+                   +----------------+
+
+                         */
+                        byte b = rec[0];
+                        if ((b < 2) && (b >= 0)) {
+                            StunPacket rp = StunPacket.mkStunPacket(rec, miPass, near, _trans);
+                            rp.setFar(far);
+                            Log.verb(StunPacket.hexString(rp.getTid()) + "got packet type " + rp.getClass().getSimpleName() + " from " + far);
+                            synchronized (_trans) {
+                                _trans.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
+                                // tell our friend that we may have some work for them.
+                                _trans.notifyAll();
+                            }
+                        }
+                        if ((19 < b) && (b < 64)) {
+                            Log.verb("got DTLS packet");
+                        }
+                        if (b < 0) {
+                            Log.verb("RTP packet ?");
                         }
                     } catch (SocketTimeoutException t) {
                         ;// don't care
@@ -127,25 +149,30 @@ public class ThreadedIceEngine implements IceEngine {
                 long now = System.currentTimeMillis();
                 List<StunPacket> tos = null;
                 synchronized (_trans) {
-                     tos = _trans.transact(now);
+                    tos = _trans.transact(now);
                 }
                 for (StunPacket sp : tos) {
-                    byte o[] = sp.outboundBytes(miPass);
-                    InetSocketAddress far = sp.getFar();
-                    if (far != null) {
-                        Log.verb("sending packet length " + o.length + "  to " + far);
-                        DatagramPacket out = new DatagramPacket(o, 0, o.length, far);
-                        _sock.send(out);
-                        // rate limit this here....
-                        Thread.sleep(Ta);
-                    } else {
-                        Log.verb("not sending packet to unresolved address");
+                    if (sp != null) {
+                        byte o[] = sp.outboundBytes(miPass);
+                        InetSocketAddress far = sp.getFar();
+                        if (far != null) {
+                            Log.verb(StunPacket.hexString(sp.getTid()) + " sending packet type " + sp.getClass().getSimpleName() + " length " + o.length + "  to " + far);
+                            DatagramPacket out = new DatagramPacket(o, 0, o.length, far);
+                            _sock.send(out);
+                            // rate limit this here....
+                            Thread.sleep(Ta);
+                        } else {
+                            Log.verb("not sending packet to unresolved address");
+                        }
                     }
                 }
                 synchronized (_trans) {
+                    _trans.removeComplete();
                     long next = _trans.nextDue();
                     int snooze = (int) (next - now);
-                    _trans.wait(snooze);
+                    if (snooze > Ta ){
+                        _trans.wait(snooze);
+                    }
                 }
             } catch (Exception x) {
                 Log.error("Exception in loop" + x.getMessage());

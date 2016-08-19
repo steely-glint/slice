@@ -331,6 +331,7 @@ For incoming connectivity checks that pass validation,
                         }
                         if (host != null) {
                             StunBindingTransaction sbt = new StunBindingTransaction(host, port);
+                            sbt.setCause("outbound gather");
 
                             sbt.oncomplete = (RTCEventData e) -> {
                                 Log.debug("got binding reply - or timeout");

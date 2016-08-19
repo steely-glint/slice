@@ -63,6 +63,10 @@ public class StunPacket {
         return mi;
     }
 
+    static StunPacket mkStunPacket(byte[] outb, Map<String, String> miPass, InetSocketAddress near) throws Exception {
+        return mkStunPacket(outb,miPass, near,null);
+    }
+
     ArrayList<StunAttribute> _attributes;
     Integer _fingerprint;
     byte[] _messageIntegrity;
@@ -71,11 +75,12 @@ public class StunPacket {
     byte[] _pass;
     private InetSocketAddress _far;
     private InetSocketAddress _near;
-    
+
     public byte[] outboundBytes(Map<String, String> miPass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
-        byte[] pass = StunPacket.findPass(_attributes, miPass);
+        byte[] pass = StunPacket.findPass(_attributes, miPass,null);
         return outboundBytes(pass);
     }
+
     public byte[] outboundBytes() throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
         return outboundBytes(_pass);
     }
@@ -183,36 +188,53 @@ public class StunPacket {
         _mtype = mtype;
     }
 
-    static byte[] findPass(ArrayList<StunAttribute> attributes, Map<String, String> miPass) throws NoSuchAlgorithmException {
+    static byte[] findPass(ArrayList<StunAttribute> attributes, Map<String, String> miPass, IceStunBindingTransaction st) throws NoSuchAlgorithmException {
         byte[] ret = null;
         String pass = null;
         String realm = null;
         String username = null;
-        for (StunAttribute a : attributes) {
-            if (a.getName() != null) {
-                if (a.getName().equals("USERNAME")) {
-                    username = a.getString();
+        if ((attributes != null) && (attributes.size() > 0)) {
+
+            for (StunAttribute a : attributes) {
+                if (a.getName() != null) {
+                    if (a.getName().equals("USERNAME")) {
+                        username = a.getString();
+                    }
+                    if (a.getName().equals("REALM")) {
+                        realm = a.getString();
+                    }
                 }
-                if (a.getName().equals("REALM")) {
-                    realm = a.getString();
+            }
+            if (username == null) {
+                Log.warn("no username attribute in this packet");
+                if (st != null) {
+                    Log.warn("looking in transaction");
+                    username = st.getUserName();
+                    Log.verb("found username in transaction "+username);
                 }
             }
-        }
-        if (username != null) {
-            String suser = username.split(":")[0];
-            pass = miPass.get(suser);
-            if ((realm != null) && (pass != null)) {
-                pass = suser + ":" + realm + ":" + pass; // should do SASLPrep
+            if (username != null) {
+                String suser = username.split(":")[0];
+                pass = miPass.get(suser);
+                if ((realm != null) && (pass != null)) {
+                    pass = suser + ":" + realm + ":" + pass; // should do SASLPrep
+                }
+                Log.debug("User =" + username + " pass =" + pass);
+            } else {
+                Log.warn("no username attribute in this packet or transaction");
             }
-            Log.debug("User =" + username + " pass =" + pass);
-        }
-        if (pass != null) {
-            ret = pass.getBytes();
-            if (realm != null) {
-                MessageDigest md5;
-                md5 = MessageDigest.getInstance("MD5");
-                ret = md5.digest(ret);
+            if (pass != null) {
+                ret = pass.getBytes();
+                if (realm != null) {
+                    MessageDigest md5;
+                    md5 = MessageDigest.getInstance("MD5");
+                    ret = md5.digest(ret);
+                }
+            } else {
+                Log.warn("no matching pass found");
             }
+        } else {
+            Log.warn("no attributes in this packet");
         }
         return ret;
     }
@@ -243,7 +265,7 @@ public class StunPacket {
     The idea of these static methods is basically paranoia - no stunpacket object is created untill
     the packet has passed validation checks. It also ensures we can create the correct type.
      */
-    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near) throws Exception {
+    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near,StunTransactionManager stm) throws Exception {
         StunPacket ret = null;
         if (inbound.length >= 20) {
             ByteBuffer b_frame = ByteBuffer.wrap(inbound);
@@ -257,11 +279,12 @@ public class StunPacket {
                     Log.debug(" stun packet with valid cookie type = " + mtype + " length =" + mlen);
                     byte[] tid = new byte[12];
                     b_frame.get(tid);
-
+                    IceStunBindingTransaction trans = stm.getIceBindingTrans(tid);
+                    
                     if (mlen <= inbound.length - 20) {
                         ByteBuffer tit = b_frame.slice();
                         ArrayList<StunAttribute> attributes = parseAttributes(tit);
-                        byte[] pass = findPass(attributes, miPass);
+                        byte[] pass = findPass(attributes, miPass,trans);
                         Integer fingerprint = null;
                         if (hasAttribute(attributes, "FINGERPRINT")) {
                             fingerprint = new Integer(calculateFingerprint(inbound));
@@ -399,8 +422,6 @@ public class StunPacket {
         this._near = _near;
     }
 
-
-
     static class FingerPrintException extends Exception {
 
         public FingerPrintException() {
@@ -420,4 +441,16 @@ public class StunPacket {
         }
     }
 
+    public static String hexString(byte[] buf) {
+        StringBuilder b = new StringBuilder();
+
+        for (byte r : buf) {
+            String dig = Integer.toHexString((0xff) & r).toUpperCase();
+            if (dig.length() == 1) {
+                b.append('0');
+            }
+            b.append(dig);
+        }
+        return b.toString();
+    }
 }

@@ -65,6 +65,8 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
                 }
             } else {
                 bind = new StunBindingRequest();
+                bind.setTid(this.getTid());
+                bind.setFar(_far);
                 dueTime = System.currentTimeMillis() + (TIMEOUT * retries++);
             }
         } else {
