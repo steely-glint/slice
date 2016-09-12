@@ -19,6 +19,10 @@ public class RTCDtlsTransport extends RTCStatsProvider {
     RTCIceTransport transport;
     RTCDtlsTransportState state;
 
+    RTCDtlsTransport(RTCIceTransport transport, List<RTCCertificate> certificates){
+        
+    }
+    
     RTCDtlsParameters getLocalParameters() {
         return null;
     }

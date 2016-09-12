@@ -5,8 +5,6 @@
  */
 package com.ipseorama.slice;
 
-import com.ipseorama.slice.ORTC.RTCDataChannel;
-import com.ipseorama.slice.ORTC.RTCDtlsTransport;
 import com.ipseorama.slice.ORTC.RTCIceGatherer;
 import com.ipseorama.slice.ORTC.RTCIceParameters;
 import com.ipseorama.slice.ORTC.RTCIceTransport;

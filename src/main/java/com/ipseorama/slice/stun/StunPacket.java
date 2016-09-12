@@ -214,12 +214,21 @@ public class StunPacket {
                 }
             }
             if (username != null) {
-                String suser = username.split(":")[0];
-                pass = miPass.get(suser);
-                if ((realm != null) && (pass != null)) {
-                    pass = suser + ":" + realm + ":" + pass; // should do SASLPrep
+                String[] susers = username.split(":");
+                int z=0;
+                pass = miPass.get(susers[0]);
+                if (pass == null){
+                    pass = miPass.get(susers[1]);
+                    z=1;
                 }
-                Log.debug("User =" + username + " pass =" + pass);
+                if ((realm != null) && (pass != null)) {
+                    pass = susers[z] + ":" + realm + ":" + pass; // should do SASLPrep
+                }
+                Log.debug("User =" + username + " pass =" + pass +" based on "+susers[z]);
+                if (pass == null){
+                    Log.debug("miPass contained:");
+                    miPass.forEach((String u,String p) -> {Log.debug("\t"+u+" "+p); });
+                }
             } else {
                 Log.warn("no username attribute in this packet or transaction");
             }
@@ -452,5 +461,8 @@ public class StunPacket {
             b.append(dig);
         }
         return b.toString();
+    }
+    public String toString(){
+        return "Stun pkt "+this.getClass().getSimpleName()+ " far ="+this._far+ " near ="+this._near;
     }
 }

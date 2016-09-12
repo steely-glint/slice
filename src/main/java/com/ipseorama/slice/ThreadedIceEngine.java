@@ -65,6 +65,10 @@ public class ThreadedIceEngine implements IceEngine {
     @Override
     public void addIceCreds(String user, String pass) {
         miPass.put(user, pass);
+        if (Log.getLevel() >= Log.DEBUG){
+            Log.debug("mipass list is:");
+            miPass.forEach((String u, String p) -> {Log.debug("\t"+u+" "+p);});
+        }
     }
 
     /*

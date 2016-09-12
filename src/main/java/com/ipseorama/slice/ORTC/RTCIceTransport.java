@@ -187,6 +187,8 @@ public class RTCIceTransport {
      * potentially create a new transaction for it.
      *
      * @param p
+     * @param prot
+     * @param ipv
      * @return
      */
     public List<StunTransaction> received(StunPacket p, RTCIceProtocol prot, int ipv) {
@@ -202,8 +204,9 @@ public class RTCIceTransport {
                 if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
                     RTCIceCandidatePair inbound = findMatchingPair(sbr, prot, ipv);
                     if (inbound == null) {
+                        Log.verb("about to mkpair from " + sbr.toString() + " ipv" + ipv);
                         inbound = mkPair(sbr, prot, ipv);
-                        Log.verb("create pair "+inbound.toString()+" ipv"+ipv);
+                        Log.verb("create pair " + inbound.toString() + " ipv" + ipv);
                     }
                     StunBindingTransaction replyTrans = new StunBindingTransaction(sbr);
                     replyTrans.setCause("inbound");
@@ -242,11 +245,11 @@ public class RTCIceTransport {
             return r.sameEnough(t_far);
         }).findAny();
         RTCIceCandidate far = fopt.orElse(t_far);
-        Optional<RTCIceCandidate> nopt = this.remoteCandidates.stream().filter((RTCIceCandidate r) -> {
-            return r.sameEnough(t_far);
+        Optional<RTCIceCandidate> nopt = this.getLocalCandidates().stream().filter((RTCIceCandidate r) -> {
+            return r.sameEnough(t_near);
         }).findAny();
         RTCIceCandidate near = nopt.orElse(t_near);
-        RTCIceCandidatePair ret = new RTCIceCandidatePair(far, near);
+        RTCIceCandidatePair ret = new RTCIceCandidatePair(near, far);
         candidatePairs.add(ret);
         return ret;
     }
@@ -260,6 +263,10 @@ public class RTCIceTransport {
      */
     public long getTieBreaker() {
         return tieBreaker;
+    }
+
+    private  List<RTCIceCandidate> getLocalCandidates() {
+        return this.iceGatherer.getLocalCandidates();
     }
 
 }
