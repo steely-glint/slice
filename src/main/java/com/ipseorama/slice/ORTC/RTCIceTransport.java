@@ -40,6 +40,7 @@ public class RTCIceTransport {
 
     private final Comparator<RTCIceCandidatePair> ordering;
     private long tieBreaker;
+    private StunTransactionManager transMan;
 
     public RTCIceTransportState getRTCIceTransportState() {
         return state;
@@ -58,8 +59,8 @@ public class RTCIceTransport {
         // and ignore the re-start semantics.
         IceEngine ice = gatherer.getIceEngine();
 
-        StunTransactionManager tm = gatherer.getStunTransactionManager();
-        tm.setTransport(this);
+        this.transMan = gatherer.getStunTransactionManager();
+        transMan.setTransport(this);
         final EventHandler oldAct = gatherer.onlocalcandidate;
         if (remoteParameters != null) {
             this.remoteParameters = remoteParameters;
@@ -161,6 +162,7 @@ public class RTCIceTransport {
                     if (p != null) {
                         candidatePairs.add(p);
                         Log.debug("added candidate pair " + p.toString());
+                        transMan.maybeAddTransactionForPair(p);
                     }
                 } else {
                     Log.debug("ignoring exisiting candidate pair " + r.toString() + " " + l.toString());
@@ -197,7 +199,7 @@ public class RTCIceTransport {
             // todo someone should check that the name/pass is right - who and how ?
             // check for required attributes.
 
-            StunBindingRequest sbr = (StunBindingRequest) p;
+            final StunBindingRequest sbr = (StunBindingRequest) p;
 
             if (sbr.hasRequiredIceAttributes()) {
                 ret = new ArrayList();
@@ -208,6 +210,10 @@ public class RTCIceTransport {
                         inbound = mkPair(sbr, prot, ipv);
                         Log.verb("create pair " + inbound.toString() + " ipv" + ipv);
                     }
+                    if (role == RTCIceRole.CONTROLLED) {
+                        inbound.setNominated(p.hasAttribute("USE-CANDIDATE"));
+                    }
+                    //to do: some state update on the pair here.
                     StunBindingTransaction replyTrans = new StunBindingTransaction(sbr);
                     replyTrans.setCause("inbound");
                     Log.verb("adding " + replyTrans.toString() + " to do reply");
@@ -215,7 +221,13 @@ public class RTCIceTransport {
                     StunTransaction triggeredTrans = inbound.trigger(this);
                     Log.verb("adding new Rtans " + triggeredTrans.toString() + " for trigger");
                     ret.add(triggeredTrans);
-
+                    final RTCIceCandidatePair mypair = inbound;
+                    mypair.setState(RTCIceCandidatePairState.INPROGRESS);
+                    triggeredTrans.oncomplete = (RTCEventData e) -> {
+                        Log.verb("triggered Rtans check complete. do something here....");
+                        //to do: some state update on the pair here.
+                        mypair.updateState(e);
+                    };
                 } else {
                     Log.verb("Ignored bining transaction - wrong user");
                 }
@@ -265,8 +277,15 @@ public class RTCIceTransport {
         return tieBreaker;
     }
 
-    private  List<RTCIceCandidate> getLocalCandidates() {
+    private List<RTCIceCandidate> getLocalCandidates() {
         return this.iceGatherer.getLocalCandidates();
+    }
+
+    public RTCIceCandidatePair findValidNominatedPair() {
+        Optional<RTCIceCandidatePair> npair = this.candidatePairs.stream().filter((RTCIceCandidatePair r) -> {
+            return r.isNominated() && r.getState() == RTCIceCandidatePairState.SUCCEEDED;
+        }).findAny(); // strictly we should order this by priority and _find first_
+        return npair.isPresent() ? npair.get() : null;
     }
 
 }

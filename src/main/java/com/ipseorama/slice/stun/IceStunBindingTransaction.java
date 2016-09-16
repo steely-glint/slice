@@ -6,6 +6,7 @@
 package com.ipseorama.slice.stun;
 
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
+import com.phono.srtplight.Log;
 import java.util.ArrayList;
 
 /**
@@ -57,4 +58,19 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         return outboundUser;
     }
 
+    @Override
+    public void received(StunPacket r) {
+        if (r instanceof StunBindingResponse) {
+            response = (StunBindingResponse) r;
+            if (response.hasRequiredAttributes()) {
+                if (oncomplete != null) {
+                    oncomplete.onEvent(this);
+                }
+            } else {
+                Log.debug("Ignored incomplete response");
+            }
+        } else {
+            Log.warn("unexpected packet type into StunBinding transaction " + r.getClass().getSimpleName());
+        }
+    }
 }

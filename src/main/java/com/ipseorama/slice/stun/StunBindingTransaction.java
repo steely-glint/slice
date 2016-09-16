@@ -21,6 +21,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     final static int MAXTRIES = 4;
     protected InetSocketAddress _ref;
     StunBindingRequest inbound = null;
+    StunBindingResponse response;
 
     public StunBindingTransaction(String host, int port) {
         super();
@@ -42,8 +43,8 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     @Override
     public void received(StunPacket r) {
         if (r instanceof StunBindingResponse) {
-            StunBindingResponse resp = (StunBindingResponse) r;
-            _ref = resp.getReflex();
+            response = (StunBindingResponse) r;
+            _ref = response.getReflex();
             complete = true;
             if (oncomplete != null) {
                 oncomplete.onEvent(this);
@@ -78,6 +79,9 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
             rbind.setRequiredAttributes(_far, ufrags);
             bind = rbind;
             complete = true; // oneshot. but no one cares...
+            if (oncomplete != null) {
+                oncomplete.onEvent(null);
+            }
         }
         return bind;
     }
@@ -87,6 +91,10 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
      */
     public InetSocketAddress getReflex() {
         return _ref;
+    }
+
+    public StunBindingResponse getResponse() {
+        return response;
     }
 
 }

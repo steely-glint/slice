@@ -5,7 +5,10 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.ORTC.RTCEventData;
+import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import com.ipseorama.slice.ORTC.RTCIceTransport;
+import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.phono.srtplight.Log;
 import java.util.ArrayList;
@@ -132,6 +135,23 @@ public class StunTransactionManager {
 
     public int size() {
         return values.size();
+    }
+
+    public RTCIceCandidatePair findValidNominatedPair() {
+        return this.transport == null ? null : transport.findValidNominatedPair();
+    }
+
+    public void maybeAddTransactionForPair(RTCIceCandidatePair p) {
+        StunTransaction transact = p.queued(this.transport);
+        final RTCIceCandidatePair mypair = p;
+        mypair.setState(RTCIceCandidatePairState.INPROGRESS);
+        transact.oncomplete = (RTCEventData e) -> {
+            Log.verb("Queued trans check complete. do something here....");
+            //to do: some state update on the pair here.
+            mypair.updateState(e);
+        };
+        Log.debug("Adding outbound transaction for " + p);
+        addTransaction(transact);
     }
 
 }

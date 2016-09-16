@@ -70,4 +70,15 @@ public class StunBindingResponse extends StunPacket {
 
         this.setAttributes(attrs);
     }
+
+    boolean hasRequiredAttributes() {
+        String reqAttrs[] = {"FINGERPRINT", "MESSAGE-INTEGRITY", "XOR-MAPPED-ADDRESS"};
+        for (String ra : reqAttrs) {
+            if (!hasAttribute(this._attributes, ra)) {
+                Log.debug("missing Attribute " + ra);
+                return false;
+            }
+        }
+        return true;
+    }
 }

@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice;
 
+import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransactionManager;
@@ -171,6 +172,10 @@ public class ThreadedIceEngine implements IceEngine {
                     }
                 }
                 synchronized (_trans) {
+                    RTCIceCandidatePair selected = _trans.findValidNominatedPair();
+                    if (selected != null){
+                        Log.debug("->>>>>>>>> selected pair is "+selected);
+                    }
                     _trans.removeComplete();
                     long next = _trans.nextDue();
                     int snooze = (int) (next - now);

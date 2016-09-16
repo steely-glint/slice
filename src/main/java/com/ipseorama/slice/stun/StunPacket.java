@@ -64,7 +64,7 @@ public class StunPacket {
     }
 
     static StunPacket mkStunPacket(byte[] outb, Map<String, String> miPass, InetSocketAddress near) throws Exception {
-        return mkStunPacket(outb,miPass, near,null);
+        return mkStunPacket(outb, miPass, near, null);
     }
 
     ArrayList<StunAttribute> _attributes;
@@ -77,7 +77,7 @@ public class StunPacket {
     private InetSocketAddress _near;
 
     public byte[] outboundBytes(Map<String, String> miPass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
-        byte[] pass = StunPacket.findPass(_attributes, miPass,null);
+        byte[] pass = StunPacket.findPass(_attributes, miPass, null);
         return outboundBytes(pass);
     }
 
@@ -210,24 +210,26 @@ public class StunPacket {
                 if (st != null) {
                     Log.warn("looking in transaction");
                     username = st.getUserName();
-                    Log.verb("found username in transaction "+username);
+                    Log.verb("found username in transaction " + username);
                 }
             }
             if (username != null) {
                 String[] susers = username.split(":");
-                int z=0;
+                int z = 0;
                 pass = miPass.get(susers[0]);
-                if (pass == null){
+                if (pass == null) {
                     pass = miPass.get(susers[1]);
-                    z=1;
+                    z = 1;
                 }
                 if ((realm != null) && (pass != null)) {
                     pass = susers[z] + ":" + realm + ":" + pass; // should do SASLPrep
                 }
-                Log.debug("User =" + username + " pass =" + pass +" based on "+susers[z]);
-                if (pass == null){
+                Log.debug("User =" + username + " pass =" + pass + " based on " + susers[z]);
+                if (pass == null) {
                     Log.debug("miPass contained:");
-                    miPass.forEach((String u,String p) -> {Log.debug("\t"+u+" "+p); });
+                    miPass.forEach((String u, String p) -> {
+                        Log.debug("\t" + u + " " + p);
+                    });
                 }
             } else {
                 Log.warn("no username attribute in this packet or transaction");
@@ -246,6 +248,10 @@ public class StunPacket {
             Log.warn("no attributes in this packet");
         }
         return ret;
+    }
+
+    public boolean hasAttribute(String aname) {
+        return _attributes == null ? false : hasAttribute(this._attributes, aname);
     }
 
     static boolean hasAttribute(ArrayList<StunAttribute> attributes, String aname) {
@@ -274,7 +280,7 @@ public class StunPacket {
     The idea of these static methods is basically paranoia - no stunpacket object is created untill
     the packet has passed validation checks. It also ensures we can create the correct type.
      */
-    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near,StunTransactionManager stm) throws Exception {
+    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near, StunTransactionManager stm) throws Exception {
         StunPacket ret = null;
         if (inbound.length >= 20) {
             ByteBuffer b_frame = ByteBuffer.wrap(inbound);
@@ -289,18 +295,20 @@ public class StunPacket {
                     byte[] tid = new byte[12];
                     b_frame.get(tid);
                     IceStunBindingTransaction trans = stm.getIceBindingTrans(tid);
-                    
+
                     if (mlen <= inbound.length - 20) {
                         ByteBuffer tit = b_frame.slice();
                         ArrayList<StunAttribute> attributes = parseAttributes(tit);
-                        byte[] pass = findPass(attributes, miPass,trans);
+                        byte[] pass = findPass(attributes, miPass, trans);
                         Integer fingerprint = null;
                         if (hasAttribute(attributes, "FINGERPRINT")) {
                             fingerprint = new Integer(calculateFingerprint(inbound));
                         }
                         byte[] messageIntegrity = null;
-                        if (miPass != null) {
-                            messageIntegrity = calculateMessageIntegrity(pass, b_frame, fingerprint != null);
+                        if (hasAttribute(attributes, "MESSAGE-INTEGRITY")) {
+                            if (miPass != null) {
+                                messageIntegrity = calculateMessageIntegrity(pass, b_frame, fingerprint != null);
+                            }
                         }
                         validatePacket(attributes, fingerprint, messageIntegrity);
                         switch (mtype) {
@@ -462,7 +470,8 @@ public class StunPacket {
         }
         return b.toString();
     }
-    public String toString(){
-        return "Stun pkt "+this.getClass().getSimpleName()+ " far ="+this._far+ " near ="+this._near;
+
+    public String toString() {
+        return "Stun pkt " + this.getClass().getSimpleName() + " far =" + this._far + " near =" + this._near;
     }
 }
