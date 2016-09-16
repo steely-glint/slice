@@ -37,6 +37,7 @@ public class ThreadedIceEngine implements IceEngine {
     static int POLL = 1000;
     static int Ta = 10;
     private Map<String, String> miPass = new HashMap();
+    private RTCIceCandidatePair selected;
 
     public synchronized void start(DatagramSocket ds, StunTransactionManager tm) {
         if (_started) {
@@ -172,7 +173,7 @@ public class ThreadedIceEngine implements IceEngine {
                     }
                 }
                 synchronized (_trans) {
-                    RTCIceCandidatePair selected = _trans.findValidNominatedPair();
+                    selected = _trans.findValidNominatedPair();
                     if (selected != null){
                         Log.debug("->>>>>>>>> selected pair is "+selected);
                     }

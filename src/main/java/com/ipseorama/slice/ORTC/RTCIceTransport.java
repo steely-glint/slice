@@ -218,16 +218,21 @@ public class RTCIceTransport {
                     replyTrans.setCause("inbound");
                     Log.verb("adding " + replyTrans.toString() + " to do reply");
                     ret.add(replyTrans);
-                    StunTransaction triggeredTrans = inbound.trigger(this);
-                    Log.verb("adding new Rtans " + triggeredTrans.toString() + " for trigger");
-                    ret.add(triggeredTrans);
-                    final RTCIceCandidatePair mypair = inbound;
-                    mypair.setState(RTCIceCandidatePairState.INPROGRESS);
-                    triggeredTrans.oncomplete = (RTCEventData e) -> {
-                        Log.verb("triggered Rtans check complete. do something here....");
-                        //to do: some state update on the pair here.
-                        mypair.updateState(e);
-                    };
+                    if (inbound.getState() != RTCIceCandidatePairState.SUCCEEDED) {
+                        // questionable state - so trigger a reverse check for this one.
+                        StunTransaction triggeredTrans = inbound.trigger(this);
+                        Log.verb("adding new Rtans " + triggeredTrans.toString() + " for trigger");
+                        ret.add(triggeredTrans);
+                        final RTCIceCandidatePair mypair = inbound;
+                        mypair.setState(RTCIceCandidatePairState.INPROGRESS);
+                        triggeredTrans.oncomplete = (RTCEventData e) -> {
+                            Log.verb("triggered Rtans check complete. do something here....");
+                            //to do: some state update on the pair here.
+                            mypair.updateState(e);
+                        };
+                    } else {
+                        Log.verb("Candidate Pair already SUCCEEDED no need to trigger -" + inbound);
+                    }
                 } else {
                     Log.verb("Ignored bining transaction - wrong user");
                 }
