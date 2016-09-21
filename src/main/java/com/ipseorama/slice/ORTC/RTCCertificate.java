@@ -9,6 +9,6 @@ package com.ipseorama.slice.ORTC;
  *
  * @author tim
  */
-class RTCCertificate {
-    
+public class RTCCertificate {
+
 }

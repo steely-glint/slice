@@ -17,7 +17,7 @@ import com.phono.srtplight.Log;
  *
  * @author tim
  */
-public class RTCIceCandidatePair {
+public class RTCIceCandidatePair implements RTCEventData{
 
     private final RTCIceCandidate local;
     private final RTCIceCandidate remote;

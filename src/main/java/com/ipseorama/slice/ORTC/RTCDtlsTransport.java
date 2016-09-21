@@ -6,6 +6,7 @@
 package com.ipseorama.slice.ORTC;
 
 import com.ipseorama.slice.ORTC.enums.RTCDtlsTransportState;
+import com.phono.srtplight.Log;
 import java.beans.EventHandler;
 import java.util.List;
 
@@ -19,7 +20,7 @@ public class RTCDtlsTransport extends RTCStatsProvider {
     RTCIceTransport transport;
     RTCDtlsTransportState state;
 
-    RTCDtlsTransport(RTCIceTransport transport, List<RTCCertificate> certificates){
+    public RTCDtlsTransport(RTCIceTransport transport, List<RTCCertificate> certificates){
         
     }
     
@@ -38,7 +39,8 @@ public class RTCDtlsTransport extends RTCStatsProvider {
     }
 
     
-    void start(RTCDtlsParameters remoteParameters) {
+    public void start(RTCDtlsParameters remoteParameters) {
+        Log.debug("would start DTLS here... ");
     }
 
     
@@ -47,4 +49,5 @@ public class RTCDtlsTransport extends RTCStatsProvider {
     
     EventHandler onstatechange;
     EventHandler onerror;
+
 }

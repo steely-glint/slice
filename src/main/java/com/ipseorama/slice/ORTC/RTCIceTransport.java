@@ -37,6 +37,7 @@ public class RTCIceTransport {
     RTCIceParameters remoteParameters;
     List<RTCIceCandidate> remoteCandidates;
     List<RTCIceCandidatePair> candidatePairs;
+    RTCIceCandidatePair selectedPair;
 
     private final Comparator<RTCIceCandidatePair> ordering;
     private long tieBreaker;
@@ -51,7 +52,7 @@ public class RTCIceTransport {
     }
 
     public RTCIceCandidatePair getSelectedCandidatePair() {
-        return null;
+        return selectedPair;
     }
 
     public void start(RTCIceGatherer gatherer, RTCIceParameters remoteParameters, RTCIceRole role) {
@@ -290,7 +291,31 @@ public class RTCIceTransport {
         Optional<RTCIceCandidatePair> npair = this.candidatePairs.stream().filter((RTCIceCandidatePair r) -> {
             return r.isNominated() && r.getState() == RTCIceCandidatePairState.SUCCEEDED;
         }).findAny(); // strictly we should order this by priority and _find first_
-        return npair.isPresent() ? npair.get() : null;
+        RTCIceCandidatePair ret = npair.isPresent() ? npair.get() : null;
+        Log.verb("selected pair          "+ret);
+        Log.verb("old selected pair was  "+selectedPair);
+        if (ret != selectedPair) {
+            Log.debug("have new selected pair "+ret);
+            Log.debug("old selected pair was  "+selectedPair);
+
+            if (selectedPair == null) {
+                this.setState(RTCIceTransportState.CONNECTED);
+            }
+            if (ret == null){
+                this.setState(RTCIceTransportState.DISCONNECTED);
+            }
+            selectedPair = ret;
+            if (null != this.oncandidatepairchange){
+                 oncandidatepairchange.onEvent(selectedPair);
+            }
+        }
+        return ret;
     }
+
+    public RTCIceTransportState getState() {
+        return this.state;
+    }
+
+
 
 }
