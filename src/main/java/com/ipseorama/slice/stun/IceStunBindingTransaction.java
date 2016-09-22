@@ -63,6 +63,7 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         if (r instanceof StunBindingResponse) {
             response = (StunBindingResponse) r;
             if (response.hasRequiredAttributes()) {
+                complete = true;
                 if (oncomplete != null) {
                     oncomplete.onEvent(this);
                 }

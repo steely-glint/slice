@@ -7,6 +7,7 @@ package com.ipseorama.slice;
 
 import com.ipseorama.slice.stun.StunTransactionManager;
 import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
 
 /**
  *
@@ -20,5 +21,7 @@ public interface IceEngine {
 
     public void addIceCreds(String user, String pass);
     public StunTransactionManager getTransactionManager() ;
+
+    public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo);
 
 }

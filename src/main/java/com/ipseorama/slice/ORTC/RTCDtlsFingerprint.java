@@ -9,8 +9,13 @@ package com.ipseorama.slice.ORTC;
  *
  * @author tim
  */
-class RTCDtlsFingerprint {
+public class RTCDtlsFingerprint {
 
+    public RTCDtlsFingerprint(String a, String v) {
+        this.algorithm = a;
+        this.value = v;
+
+    }
     private String algorithm;
     private String value;
 

@@ -6,15 +6,23 @@
 package com.ipseorama.slice.ORTC;
 
 import com.ipseorama.slice.ORTC.enums.RTCDtlsRole;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  *
  * @author tim
  */
-class RTCDtlsParameters {
-             private RTCDtlsRole                  role;// = "auto";
-             private List<RTCDtlsFingerprint> fingerprints;
+public class RTCDtlsParameters {
+
+    private RTCDtlsRole role;// = "auto";
+    private List<RTCDtlsFingerprint> fingerprints;
+
+    public RTCDtlsParameters(RTCDtlsRole r, RTCDtlsFingerprint f) {
+        fingerprints = new ArrayList();
+        fingerprints.add(f);
+        role = r;
+    }
 
     /**
      * @return the role
@@ -30,17 +38,4 @@ class RTCDtlsParameters {
         this.role = role;
     }
 
-    /**
-     * @return the fingerprints
-     */
-    public List<RTCDtlsFingerprint> getFingerprints() {
-        return fingerprints;
-    }
-
-    /**
-     * @param fingerprints the fingerprints to set
-     */
-    public void setFingerprints(List<RTCDtlsFingerprint> fingerprints) {
-        this.fingerprints = fingerprints;
-    }
 }

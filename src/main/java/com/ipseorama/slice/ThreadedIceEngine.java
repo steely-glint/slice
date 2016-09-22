@@ -67,9 +67,11 @@ public class ThreadedIceEngine implements IceEngine {
     @Override
     public void addIceCreds(String user, String pass) {
         miPass.put(user, pass);
-        if (Log.getLevel() >= Log.DEBUG){
+        if (Log.getLevel() >= Log.DEBUG) {
             Log.debug("mipass list is:");
-            miPass.forEach((String u, String p) -> {Log.debug("\t"+u+" "+p);});
+            miPass.forEach((String u, String p) -> {
+                Log.debug("\t" + u + " " + p);
+            });
         }
     }
 
@@ -131,6 +133,9 @@ public class ThreadedIceEngine implements IceEngine {
                         }
                         if ((19 < b) && (b < 64)) {
                             Log.verb("got DTLS packet");
+                            if (selected != null) {
+                                selected.pushDTLS(rec, near, far);
+                            }
                         }
                         if (b < 0) {
                             Log.verb("RTP packet ?");
@@ -174,13 +179,13 @@ public class ThreadedIceEngine implements IceEngine {
                 }
                 synchronized (_trans) {
                     selected = _trans.findValidNominatedPair();
-                    if (selected != null){
-                        Log.debug("->>>>>>>>> selected pair is "+selected);
+                    if (selected != null) {
+                        Log.debug("->>>>>>>>> selected pair is " + selected);
                     }
                     _trans.removeComplete();
                     long next = _trans.nextDue();
                     int snooze = (int) (next - now);
-                    if (snooze > Ta ){
+                    if (snooze > Ta) {
                         _trans.wait(snooze);
                     }
                 }
@@ -202,6 +207,19 @@ public class ThreadedIceEngine implements IceEngine {
     @Override
     public StunTransactionManager getTransactionManager() {
         return this._trans;
+    }
+
+    @Override
+    public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) {
+        DatagramPacket p = new DatagramPacket(buf, off, len, dtlsTo);
+        try {
+            _sock.send(p);
+        } catch (Exception x) {
+            Log.error("Exception in sendTo" + x.getMessage());
+            if (Log.getLevel() >= Log.DEBUG) {
+                x.printStackTrace();
+            }
+        }
     }
 
 }

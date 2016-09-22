@@ -12,6 +12,7 @@ import com.ipseorama.slice.stun.StunBindingResponse;
 import com.ipseorama.slice.stun.StunBindingTransaction;
 import com.ipseorama.slice.stun.StunTransaction;
 import com.phono.srtplight.Log;
+import java.net.InetSocketAddress;
 
 /**
  *
@@ -23,6 +24,7 @@ public class RTCIceCandidatePair implements RTCEventData{
     private final RTCIceCandidate remote;
     private RTCIceCandidatePairState state;
     private boolean nominated;
+    public EventHandler onDtls ;
 
     RTCIceCandidatePair(RTCIceCandidate local, RTCIceCandidate remote) {
         this.local = local;
@@ -152,5 +154,18 @@ A check for this pair hasn't been performed, and it can't yet be performed until
     void setNominated(boolean b) {
         nominated = b;
     }
+
+    public void pushDTLS(byte[] rec, InetSocketAddress near, InetSocketAddress far) {
+        if (onDtls != null){
+           //if (getLocal().sameSocketAddress(near) && getRemote().sameSocketAddress(far)){
+               RTCDtlsPacket dat = new RTCDtlsPacket();
+               dat.data = rec;
+               onDtls.onEvent(dat);
+           //} else {
+           //    Log.debug("dtls packet doesn't match selected candidate "+ this.toString()+ " vs " +far +" -> "+ near );
+           //}
+        }
+    }
+
 
 }

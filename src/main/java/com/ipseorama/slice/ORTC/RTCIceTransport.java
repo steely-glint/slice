@@ -17,6 +17,7 @@ import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransaction;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
+import java.net.InetSocketAddress;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -42,6 +43,7 @@ public class RTCIceTransport {
     private final Comparator<RTCIceCandidatePair> ordering;
     private long tieBreaker;
     private StunTransactionManager transMan;
+    private InetSocketAddress dtlsTo;
 
     public RTCIceTransportState getRTCIceTransportState() {
         return state;
@@ -292,8 +294,8 @@ public class RTCIceTransport {
             return r.isNominated() && r.getState() == RTCIceCandidatePairState.SUCCEEDED;
         }).findAny(); // strictly we should order this by priority and _find first_
         RTCIceCandidatePair ret = npair.isPresent() ? npair.get() : null;
-        Log.verb("selected pair          "+ret);
-        Log.verb("old selected pair was  "+selectedPair);
+        //Log.verb("selected pair          "+ret);
+        //Log.verb("old selected pair was  "+selectedPair);
         if (ret != selectedPair) {
             Log.debug("have new selected pair "+ret);
             Log.debug("old selected pair was  "+selectedPair);
@@ -305,6 +307,7 @@ public class RTCIceTransport {
                 this.setState(RTCIceTransportState.DISCONNECTED);
             }
             selectedPair = ret;
+            dtlsTo = new InetSocketAddress(selectedPair.getRemote().getIp(),selectedPair.getRemote().getPort());
             if (null != this.oncandidatepairchange){
                  oncandidatepairchange.onEvent(selectedPair);
             }
@@ -315,6 +318,15 @@ public class RTCIceTransport {
     public RTCIceTransportState getState() {
         return this.state;
     }
+
+    public void sendDtlsPkt(byte[] buf, int off, int len) {
+        Log.debug("Will send dtls packet to "+dtlsTo);
+        IceEngine ice = this.iceGatherer.getIceEngine();
+        
+        ice.sendTo(buf,off,len,dtlsTo);
+        // use selectedPair  to send packet.
+    }
+
 
 
 

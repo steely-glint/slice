@@ -5,10 +5,17 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import java.util.function.Consumer;
+
 /**
  *
  * @author tim
  */
-public class RTCCertificate {
+public interface RTCCertificate {
 
+    long getExpires();
+    RTCDtlsFingerprint getFingerprint();
+    String getAlgorithm();
+    void generateCertificate(String keygenAlgorithm, Consumer <RTCCertificate> cons);
+    
 }

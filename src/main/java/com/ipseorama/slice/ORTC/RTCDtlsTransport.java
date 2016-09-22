@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.ORTC.enums.RTCDtlsRole;
 import com.ipseorama.slice.ORTC.enums.RTCDtlsTransportState;
 import com.phono.srtplight.Log;
 import java.beans.EventHandler;
@@ -19,35 +20,37 @@ public class RTCDtlsTransport extends RTCStatsProvider {
     List<RTCCertificate> certificates;
     RTCIceTransport transport;
     RTCDtlsTransportState state;
+    private RTCDtlsParameters remoteParameters;
+    private RTCDtlsParameters localParameters;
 
-    public RTCDtlsTransport(RTCIceTransport transport, List<RTCCertificate> certificates){
-        
+    public RTCDtlsTransport(RTCIceTransport transport, List<RTCCertificate> certificates, RTCDtlsParameters localParameters) {
+        this.localParameters = localParameters;
+        this.transport = transport;
+        this.certificates = certificates;
     }
-    
-    RTCDtlsParameters getLocalParameters() {
+
+    public RTCDtlsParameters getLocalParameters() {
+        return localParameters;
+    }
+
+    public RTCDtlsParameters getRemoteParameters() {
+        return this.remoteParameters;
+    }
+
+    public List<byte[]> getRemoteCertificates() {
         return null;
     }
 
-    
-    RTCDtlsParameters getRemoteParameters() {
-        return null;
-    }
-
-    
-    List<byte[]> getRemoteCertificates() {
-        return null;
-    }
-
-    
     public void start(RTCDtlsParameters remoteParameters) {
+        this.remoteParameters = remoteParameters;
         Log.debug("would start DTLS here... ");
+
     }
 
-    
-    void stop() {
+    public void stop() {
     }
-    
-    EventHandler onstatechange;
-    EventHandler onerror;
+
+    public EventHandler onstatechange;
+    public EventHandler onerror;
 
 }
