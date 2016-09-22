@@ -179,9 +179,6 @@ public class ThreadedIceEngine implements IceEngine {
                 }
                 synchronized (_trans) {
                     selected = _trans.findValidNominatedPair();
-                    if (selected != null) {
-                        Log.debug("->>>>>>>>> selected pair is " + selected);
-                    }
                     _trans.removeComplete();
                     long next = _trans.nextDue();
                     int snooze = (int) (next - now);
