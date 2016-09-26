@@ -13,7 +13,6 @@ import com.phono.srtplight.Log;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
@@ -132,9 +131,11 @@ public class ThreadedIceEngine implements IceEngine {
                             }
                         }
                         if ((19 < b) && (b < 64)) {
-                            Log.verb("got DTLS packet");
+                            Log.debug("push inbound DTLS packet");
                             if (selected != null) {
                                 selected.pushDTLS(rec, near, far);
+                            } else {
+                                Log.debug("dumping DTLS packet - no selected pair - yet...");
                             }
                         }
                         if (b < 0) {

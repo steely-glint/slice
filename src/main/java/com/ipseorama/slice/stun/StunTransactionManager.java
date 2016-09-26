@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
 /**
@@ -26,10 +28,10 @@ public class StunTransactionManager {
 
     long NAPLEN = 1000;
     private RTCIceTransport transport;
-    private ArrayList<StunTransaction> values;
+    private Queue<StunTransaction> values;
 
     public StunTransactionManager() {
-        values = new ArrayList();
+        values = new ConcurrentLinkedQueue();
     }
 
     public void addTransaction(StunTransaction t) {
@@ -53,12 +55,12 @@ public class StunTransactionManager {
         if (t != null) {
             Log.verb("found matching " + t.getClass().getSimpleName() + " for tid " + StunPacket.hexString(tid));
         } else {
-            Log.verb("no matching transaction for tid " + StunPacket.hexString(tid));
+            Log.debug("no matching transaction for tid " + StunPacket.hexString(tid));
         }
         if (t instanceof IceStunBindingTransaction) {
             ret = (IceStunBindingTransaction) t;
         } else {
-            Log.verb("not an IceStunBindingTransaction for tid " + StunPacket.hexString(tid));
+            Log.debug("not an IceStunBindingTransaction for tid " + StunPacket.hexString(tid));
         }
         return ret;
     }
@@ -88,7 +90,11 @@ public class StunTransactionManager {
 
     synchronized public void removeComplete() {
         values.removeIf((StunTransaction t) -> {
-            return t.isComplete();
+            boolean ret = t.isComplete();
+            if (ret){
+                Log.debug("removing " +t);
+            }
+            return ret;
         });
     }
 

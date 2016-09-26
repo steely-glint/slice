@@ -7,14 +7,12 @@ package com.ipseorama.slice.stun;
 
 import com.phono.srtplight.Log;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import javax.crypto.Mac;
 import javax.crypto.ShortBufferException;
@@ -113,7 +111,7 @@ public class StunPacket {
         for (int i = 0; i < len; i++) {
             ret[i] = bb.get(i);
         }
-        Log.debug("returning packet length " + len);
+        Log.verb("returning packet length " + len);
         return ret;
     }
 
@@ -130,7 +128,7 @@ public class StunPacket {
             ByteBuffer vbb = ByteBuffer.wrap(val);
             StunAttribute a = new StunAttribute(new Integer(a_type), a_len, vbb);
             buf.add(a);
-            Log.debug("Attribute type " + a.getName() + "(" + (int) a_type + ") " + " len " + a_len + " at " + startpos);
+            Log.verb("Attribute type " + a.getName() + "(" + (int) a_type + ") " + " len " + a_len + " at " + startpos);
             // now suckup any pad 
             int pad = a_len % 4;
             if (pad != 0) {
@@ -146,7 +144,7 @@ public class StunPacket {
     static int putAttributes(ByteBuffer bb, ArrayList<StunAttribute> attributes, byte[] pass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
         int len = 0;
         for (StunAttribute a : attributes) {
-            Log.debug("putting attribute " + a.getName() + " at " + bb.position());
+            Log.verb("putting attribute " + a.getName() + " at " + bb.position());
             len += a.put(bb);
             bb.putChar(2, (char) len); // update the length 
             if (a.getName() != null) {
@@ -226,13 +224,13 @@ public class StunPacket {
                 }
                 Log.debug("User =" + username + " pass =" + pass + " based on " + susers[z]);
                 if (pass == null) {
-                    Log.debug("miPass contained:");
+                    Log.verb("miPass contained:");
                     miPass.forEach((String u, String p) -> {
-                        Log.debug("\t" + u + " " + p);
+                        Log.verb("\t" + u + " " + p);
                     });
                 }
             } else {
-                Log.warn("no username attribute in this packet or transaction");
+                Log.warn("no username attribute in this packet or transaction" );
             }
             if (pass != null) {
                 ret = pass.getBytes();
@@ -287,11 +285,10 @@ public class StunPacket {
 
             short mtype = b_frame.getShort();
             if ((mtype & 0xC000) == 0) {
-                Log.debug("testing stun packet");
                 short mlen = b_frame.getShort();
                 long cookie = b_frame.getInt();
                 if (cookie == STUNCOOKIE) {
-                    Log.debug(" stun packet with valid cookie type = " + mtype + " length =" + mlen);
+                    Log.verb(" stun packet with valid cookie type = " + mtype + " length =" + mlen);
                     byte[] tid = new byte[12];
                     b_frame.get(tid);
                     IceStunBindingTransaction trans = stm.getIceBindingTrans(tid);
@@ -306,8 +303,18 @@ public class StunPacket {
                         }
                         byte[] messageIntegrity = null;
                         if (hasAttribute(attributes, "MESSAGE-INTEGRITY")) {
-                            if (miPass != null) {
+                            if (pass != null) {
                                 messageIntegrity = calculateMessageIntegrity(pass, b_frame, fingerprint != null);
+                            } else {
+                                if (Log.getLevel() >= Log.DEBUG) {
+                                    Log.debug("type = "+mtype);
+                                    Log.debug("Tid = "+hexString(tid));
+                                    if (attributes != null) {                                    
+                                        Log.debug("Attributes");
+                                        attributes.stream().forEach((StunAttribute a) -> {Log.debug("\t"+a.toString(tid));} );
+                                    }
+                                }
+                                throw new MessageIntegrityException("No pass available...");
                             }
                         }
                         validatePacket(attributes, fingerprint, messageIntegrity);
@@ -351,14 +358,14 @@ public class StunPacket {
 
         for (StunAttribute a : attributes) {
             String name = a.getName();
-            Log.debug("attribute " + name);
+            Log.verb("attribute " + name);
             if (name != null) {
                 if (name.equals("FINGERPRINT")) {
-                    Log.debug("Checking stun fingerprint");
+                    Log.verb("Checking stun fingerprint");
                     fpOk = (a.getInt() == fingerprint);
                 }
                 if (name.equals("MESSAGE-INTEGRITY") && (messageIntegrity != null)) {
-                    Log.debug("Checking mi");
+                    Log.verb("Checking mi");
                     byte mi[] = a.getBytes();
                     if (mi.length == messageIntegrity.length) {
                         int i = 0;
@@ -371,7 +378,7 @@ public class StunPacket {
                     }
                 }
                 if (name.equals("USERNAME")) {
-                    Log.debug("username is: " + a.getString());
+                    Log.verb("username is: " + a.getString());
                 }
             }
         }
@@ -442,12 +449,22 @@ public class StunPacket {
     static class FingerPrintException extends Exception {
 
         public FingerPrintException() {
+            super();
+        }
+
+        public FingerPrintException(String cause) {
+            super(cause);
         }
     }
 
     static class MessageIntegrityException extends Exception {
 
         public MessageIntegrityException() {
+            super();
+        }
+
+        public MessageIntegrityException(String cause) {
+            super(cause);
         }
     }
 

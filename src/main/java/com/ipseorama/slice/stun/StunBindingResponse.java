@@ -48,7 +48,7 @@ public class StunBindingResponse extends StunPacket {
 
     void setRequiredAttributes(InetSocketAddress far, String ufrags) {
 
-        Log.debug("response username=" + ufrags);
+        Log.verb("response username=" + ufrags);
         ArrayList<StunAttribute> attrs = new ArrayList();
 
         StunAttribute a = new StunAttribute("USERNAME");

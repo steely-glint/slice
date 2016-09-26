@@ -164,6 +164,8 @@ A check for this pair hasn't been performed, and it can't yet be performed until
            //} else {
            //    Log.debug("dtls packet doesn't match selected candidate "+ this.toString()+ " vs " +far +" -> "+ near );
            //}
+        } else {
+            Log.debug("dumping dtls packet - no place to push it.");
         }
     }
 

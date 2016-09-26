@@ -101,7 +101,7 @@ public class StunAttribute {
         attrs.add(p);
     }
 
-    static void addIceCon(ArrayList<StunAttribute> attrs, RTCIceRole role,long tb) {
+    static void addIceCon(ArrayList<StunAttribute> attrs, RTCIceRole role, long tb) {
         StunAttribute r = new StunAttribute("ICE-" + role.toString().toUpperCase());
         r.setLong(tb);
         attrs.add(r);
@@ -124,12 +124,13 @@ public class StunAttribute {
         u.setString(outboundUser);
         attrs.add(u);
     }
+
     static void addSoftware(ArrayList<StunAttribute> attrs) {
         StunAttribute s = new StunAttribute("SOFTWARE");
         s.setString("pe.pi.slice.ORTC");
         attrs.add(s);
     }
-    
+
     private final Integer aType;
     private int aLen;
     private ByteBuffer aVal;
@@ -351,5 +352,34 @@ public class StunAttribute {
             out.put((byte) 0);
         }
         return 4 + len + remain;
+    }
+
+    public String toString(byte[] tid)  {
+        StringBuffer ret = new StringBuffer(this.getName());
+        switch (this.aType) {
+            case 0x0001:
+                try {
+                    ret.append("=").append(this.getIpAddress());
+                } catch (Exception z) {
+                    ret.append(z.getClass().getSimpleName());
+                }
+                break;
+            case 0x0006:
+                ret.append("=").append(this.getString());
+                break;
+            case 0x0012:
+            case 0x0016:
+            case 0x0020:
+                try {
+                    ret.append("=").append(this.getXorIpAddress(tid));
+                } catch (Exception z) {
+                    ret.append(z.getClass().getSimpleName());
+                }
+                break;
+            default:
+                ret.append("=").append(StunPacket.hexString(this.getBytes()));
+                break;
+        }
+        return ret.toString();
     }
 }

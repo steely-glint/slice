@@ -44,7 +44,6 @@ public class RTCDtlsTransport extends RTCStatsProvider {
     public void start(RTCDtlsParameters remoteParameters) {
         this.remoteParameters = remoteParameters;
         Log.debug("would start DTLS here... ");
-
     }
 
     public void stop() {
