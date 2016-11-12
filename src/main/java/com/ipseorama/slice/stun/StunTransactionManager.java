@@ -38,7 +38,7 @@ public class StunTransactionManager {
         values.add(t);
     }
 
-    synchronized StunTransaction get(byte[] tid) {
+    /*synchronized*/ StunTransaction get(byte[] tid) {
         StunTransaction t = values.stream().filter(
                 (StunTransaction tt) -> {
                     boolean found = Arrays.equals(tid, tt.id);
@@ -88,7 +88,7 @@ public class StunTransactionManager {
         }
     }
 
-    synchronized public void removeComplete() {
+    /*synchronized*/ public void removeComplete() {
         values.removeIf((StunTransaction t) -> {
             boolean ret = t.isComplete();
             if (ret){
@@ -115,7 +115,7 @@ public class StunTransactionManager {
         return ret;
     }
 
-    synchronized public List<StunPacket> transact(long now) {
+    /*synchronized*/ public List<StunPacket> transact(long now) {
         List<StunPacket> pkts = values.stream().filter((StunTransaction t) -> {
             return (t != null) && !t.isComplete() && t.getDueTime() <= now;
         }).map((StunTransaction t) -> {

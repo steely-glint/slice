@@ -53,6 +53,7 @@ public class ThreadedIceEngine implements IceEngine {
             rcvloop();
         };
         _rcv = new Thread(ior, "ice-rcvr --<<--");
+        _rcv.setPriority(Thread.MAX_PRIORITY);
         _rcv.start();
         Runnable ios = () -> {
             sendloop();
@@ -124,12 +125,12 @@ public class ThreadedIceEngine implements IceEngine {
                             StunPacket rp = StunPacket.mkStunPacket(rec, miPass, near, _trans);
                             rp.setFar(far);
                             Log.verb(StunPacket.hexString(rp.getTid()) + "got packet type " + rp.getClass().getSimpleName() + " from " + far);
+                            _trans.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
+                            // tell our friend that we may have some work for them.
                             synchronized (_trans) {
-                                _trans.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
-                                // tell our friend that we may have some work for them.
                                 _trans.notifyAll();
                             }
-                        }
+                        } else 
                         if ((19 < b) && (b < 64)) {
                             Log.debug("push inbound DTLS packet");
                             if (selected != null) {
@@ -137,9 +138,11 @@ public class ThreadedIceEngine implements IceEngine {
                             } else {
                                 Log.debug("dumping DTLS packet - no selected pair - yet...");
                             }
-                        }
+                        }else 
                         if (b < 0) {
                             Log.verb("RTP packet ?");
+                        } else {
+                            Log.verb("packet first byte "+b);
                         }
                     } catch (SocketTimeoutException t) {
                         ;// don't care
@@ -160,9 +163,9 @@ public class ThreadedIceEngine implements IceEngine {
             try {
                 long now = System.currentTimeMillis();
                 List<StunPacket> tos = null;
-                synchronized (_trans) {
-                    tos = _trans.transact(now);
-                }
+                //synchronized (_trans) {
+                tos = _trans.transact(now);
+                //}
                 for (StunPacket sp : tos) {
                     if (sp != null) {
                         byte o[] = sp.outboundBytes(miPass);
