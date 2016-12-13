@@ -12,19 +12,21 @@ import com.ipseorama.slice.stun.StunBindingResponse;
 import com.ipseorama.slice.stun.StunBindingTransaction;
 import com.ipseorama.slice.stun.StunTransaction;
 import com.phono.srtplight.Log;
+import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 
 /**
  *
  * @author tim
  */
-public class RTCIceCandidatePair implements RTCEventData{
+public class RTCIceCandidatePair implements RTCEventData {
 
     private final RTCIceCandidate local;
     private final RTCIceCandidate remote;
     private RTCIceCandidatePairState state;
     private boolean nominated;
-    public EventHandler onDtls ;
+    public EventHandler onDtls;
+    public EventHandler onRTP;
 
     RTCIceCandidatePair(RTCIceCandidate local, RTCIceCandidate remote) {
         this.local = local;
@@ -81,21 +83,23 @@ public class RTCIceCandidatePair implements RTCEventData{
     }
 
     StunTransaction trigger(RTCIceTransport trans) {
-        StunTransaction ret = createTransaction(trans,"outbound triggered");
+        StunTransaction ret = createTransaction(trans, "outbound triggered");
         return ret;
     }
+
     public StunTransaction queued(RTCIceTransport trans) {
-        StunTransaction ret = createTransaction(trans,"outbound queued");
+        StunTransaction ret = createTransaction(trans, "outbound queued");
         return ret;
     }
-    StunTransaction createTransaction(RTCIceTransport trans,String cause) {
+
+    StunTransaction createTransaction(RTCIceTransport trans, String cause) {
         String host = this.remote.getIp();
         int port = (int) this.remote.getPort();
         RTCIceRole role = trans.getRole();
         long reflexPri = priority(role);
 
         long tiebreaker = trans.getTieBreaker();
-        String outboundUser = trans.getRemoteParameters().usernameFragment +":"+trans.getLocalParameters().usernameFragment;
+        String outboundUser = trans.getRemoteParameters().usernameFragment + ":" + trans.getLocalParameters().usernameFragment;
 
         IceStunBindingTransaction ret = new IceStunBindingTransaction(host, port,
                 (int) reflexPri,
@@ -105,8 +109,9 @@ public class RTCIceCandidatePair implements RTCEventData{
         ret.setCause(cause);
         return ret;
     }
-        
-    public void updateState(RTCEventData e) {        /*
+
+    public void updateState(RTCEventData e) {
+        /*
         6.1.2.4.2.3. Updating Pair States
 
 The agent sets the state of the pair that *generated* the check to Succeeded. Note that, the pair which *generated* the check may be different than the valid pair constructed in Section 6.1.2.4.2.2 as a consequence of the response. The success of this check might also cause the state of other checks to change as well. The agent MUST perform the following two steps:
@@ -118,8 +123,8 @@ If the check list is frozen, and there is at least one pair in the check list wh
 If the check list is frozen, and there are no pairs in the check list whose foundation matches a pair in the valid list under consideration, the agent
 groups together all of the pairs with the same foundation, and
 for each group, sets the state of the pair with the lowest component ID to Waiting. If there is more than one such pair, the one with the highest-priority is used.
-        */
-        /*
+         */
+ /*
 Each candidate pair in the check list has a foundation and a state. The foundation is the combination of the foundations of the local and remote candidates in the pair. The state is assigned once the check list for each media stream has been computed. There are five potential values that the state can have:
 
 Waiting:
@@ -133,41 +138,52 @@ A check for this pair was already done and failed, either never producing any re
 Frozen:
 A check for this pair hasn't been performed, and it can't yet be performed until some other check succeeds, allowing this pair to unfreeze and move into the Waiting state.
 
-        */
-        Log.debug("update pair state based on transaction completion "+e.toString());
-        if (e instanceof RTCTimeoutEvent){
+         */
+        Log.debug("update pair state based on transaction completion " + e.toString());
+        if (e instanceof RTCTimeoutEvent) {
             this.setState(RTCIceCandidatePairState.FAILED);
-        } else if (e instanceof StunBindingTransaction){
+        } else if (e instanceof StunBindingTransaction) {
             StunBindingTransaction sbt = (StunBindingTransaction) e;
             StunBindingResponse sbr = sbt.getResponse();
             // todo depending on what this looks like we may want to nominate this one.
-            if (sbr.hasAttribute("USE-CANDIADTE")){
+            if (sbr.hasAttribute("USE-CANDIADTE")) {
                 this.nominated = true;
             }
             this.setState(RTCIceCandidatePairState.SUCCEEDED);
-        } 
+        }
     }
-    public boolean isNominated(){
+
+    public boolean isNominated() {
         return nominated;
-    } 
+    }
 
     void setNominated(boolean b) {
         nominated = b;
     }
 
     public void pushDTLS(byte[] rec, InetSocketAddress near, InetSocketAddress far) {
-        if (onDtls != null){
-           //if (getLocal().sameSocketAddress(near) && getRemote().sameSocketAddress(far)){
-               RTCDtlsPacket dat = new RTCDtlsPacket();
-               dat.data = rec;
-               onDtls.onEvent(dat);
-           //} else {
-           //    Log.debug("dtls packet doesn't match selected candidate "+ this.toString()+ " vs " +far +" -> "+ near );
-           //}
+        if (onDtls != null) {
+            //if (getLocal().sameSocketAddress(near) && getRemote().sameSocketAddress(far)){
+            RTCDtlsPacket dat = new RTCDtlsPacket();
+            dat.data = rec;
+            onDtls.onEvent(dat);
+            //} else {
+            //    Log.debug("dtls packet doesn't match selected candidate "+ this.toString()+ " vs " +far +" -> "+ near );
+            //}
         } else {
             Log.debug("dumping dtls packet - no place to push it.");
         }
     }
 
+    public void pushRTP(DatagramPacket dgp) {
+        if (onRTP != null) {
+            RTCRtpPacket dat = new RTCRtpPacket();
+            dat.data = dgp;
+            onRTP.onEvent(dat);
+            Log.verb("fired onEvent srtp packet ");
+        } else {
+            Log.debug("dumping rtp packet - no place to push it.");
+        }
+    }
 
 }
