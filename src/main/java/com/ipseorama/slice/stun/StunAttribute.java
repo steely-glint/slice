@@ -337,7 +337,7 @@ public class StunAttribute {
             out.put((byte) (aVal.get(2) ^ out.get(4)));
             out.put((byte) (aVal.get(3) ^ out.get(5)));
             for (int i = 4; i < aLen; i++) {
-                byte xv = (byte) (aVal.get(i) ^ out.get(4 + i));
+                byte xv = (byte) (aVal.get(i) ^ out.get(i));
                 out.put(xv);
             }
         } else {

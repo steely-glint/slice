@@ -140,7 +140,6 @@ public class ThreadedIceEngine implements IceEngine {
                             }
                         }else 
                         if (b < 0) {
-                            Log.verb("pushing srtp packet");
                             selected.pushRTP(dgp);
                         } else {
                             Log.verb("packet first byte "+b);
