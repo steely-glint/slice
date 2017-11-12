@@ -149,7 +149,9 @@ public class ThreadedIceEngine implements IceEngine {
                     }
                 } catch (Exception x) {
                     Log.error("Exception in rcv loop");
-                    x.printStackTrace();
+                    if (Log.getLevel() >= Log.VERB) {
+                        x.printStackTrace();
+                    }
                 }
             }
             _send = null; // kill our partner
