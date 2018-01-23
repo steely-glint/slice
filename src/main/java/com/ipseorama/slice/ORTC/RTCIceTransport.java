@@ -68,6 +68,7 @@ public class RTCIceTransport {
         if (remoteParameters != null) {
             this.remoteParameters = remoteParameters;
         }
+        this.role = role;
         gatherer.onlocalcandidate = (RTCEventData c) -> {
             if (c instanceof RTCIceCandidate) {
                 RTCIceCandidate l = (RTCIceCandidate) c;

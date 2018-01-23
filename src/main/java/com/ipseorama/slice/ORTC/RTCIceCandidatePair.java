@@ -148,7 +148,12 @@ A check for this pair hasn't been performed, and it can't yet be performed until
             // todo depending on what this looks like we may want to nominate this one.
             if (sbr.hasAttribute("USE-CANDIADTE")) {
                 this.nominated = true;
+            } else if (sbt instanceof IceStunBindingTransaction) {
+                if (((IceStunBindingTransaction) sbt).sentUseCandidate()) {
+                    this.nominated = true;
+                }
             }
+
             this.setState(RTCIceCandidatePairState.SUCCEEDED);
         }
     }

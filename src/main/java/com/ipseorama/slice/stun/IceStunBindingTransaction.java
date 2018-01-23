@@ -48,6 +48,9 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         StunAttribute.addUsername(attrs, outboundUser);
         StunAttribute.addSoftware(attrs);
         StunAttribute.addIceCon(attrs, role, tiebreaker);
+        if (role.equals(RTCIceRole.CONTROLLING)){
+            StunAttribute.addUseCandidate(attrs);
+        }
         StunAttribute.addMessageIntegrity(attrs);
         StunAttribute.addFingerprint(attrs);
 
@@ -58,6 +61,9 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         return outboundUser;
     }
 
+    public boolean sentUseCandidate(){
+        return role.equals(RTCIceRole.CONTROLLING);
+    }
     @Override
     public void received(StunPacket r) {
         if (r instanceof StunBindingResponse) {

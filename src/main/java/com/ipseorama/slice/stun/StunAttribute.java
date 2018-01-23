@@ -131,6 +131,11 @@ public class StunAttribute {
         attrs.add(s);
     }
 
+    static void addUseCandidate(ArrayList<StunAttribute> attrs) {
+        StunAttribute s = new StunAttribute("USE-CANDIDATE");
+        attrs.add(s);
+    }
+
     private final Integer aType;
     private int aLen;
     private ByteBuffer aVal;
