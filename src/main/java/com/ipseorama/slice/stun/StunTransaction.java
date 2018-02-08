@@ -28,6 +28,8 @@ public abstract class StunTransaction {
      * either due to timeout or a reply
      */
     public EventHandler oncomplete;
+    public EventHandler onerror;
+
 
     /**
      * constructor for initiating transactions 

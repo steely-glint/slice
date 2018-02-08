@@ -93,4 +93,22 @@ public class StunBindingRequest extends StunPacket {
         }
         return ret;
     }
+
+    public boolean localAgentHasBiggerTieBreaker(long near,String aname) {
+        boolean ret = false;
+        StunAttribute ira = this.getAttributeByName(aname);
+        long far = ira.getLong();
+
+        // there are no unsigned longs,
+        // so we shift the top bit downwards
+        // losing a bit of precison        
+        long farb = far >>> 1;
+        long nearb = near >>> 1;
+        if (farb == nearb) { // in the staggeringly unlikey situation that the lowest bit is the only difference
+            ret = (near & 1) > (far & 1); // compare the original lowest bits
+        } else {
+            ret = nearb > farb; // otherwise we compare the 63 bit values.
+        }
+        return ret;
+    }
 }

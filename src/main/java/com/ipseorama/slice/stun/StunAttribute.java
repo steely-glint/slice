@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -179,14 +180,19 @@ public class StunAttribute {
         aVal.putLong(n);
     }
 
-    class ErrorAttribute {
 
-        final int code;
+
+    public class ErrorAttribute implements RTCEventData{
+
+        public final int code;
         final String reason;
 
         ErrorAttribute(int c, String r) {
             code = c;
             reason = r;
+        }
+        public String toString(){
+            return "Error Attribute. Code="+code+" reason="+reason;
         }
     };
 
@@ -205,7 +211,9 @@ public class StunAttribute {
         return new ErrorAttribute(code, reason);
 
     }
-
+    ErrorAttribute makeErrorAttribute(int code, String reason) {
+        return new ErrorAttribute(code,reason); //To change body of generated methods, choose Tools | Templates.
+    }
     // note to self - never use the stateful get() modes of byteBuffer here -
     // always use indexes.
     InetSocketAddress getIpAddress() throws UnknownHostException {

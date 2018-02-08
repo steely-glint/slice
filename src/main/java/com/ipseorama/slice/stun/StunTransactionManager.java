@@ -156,6 +156,9 @@ public class StunTransactionManager {
             //to do: some state update on the pair here.
             mypair.updateState(e);
         };
+        transact.onerror = (RTCEventData e) -> {
+            transport.onError(e);
+        };
         Log.debug("Adding outbound transaction for " + p);
         addTransaction(transact);
     }

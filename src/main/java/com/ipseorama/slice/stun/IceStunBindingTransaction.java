@@ -16,7 +16,7 @@ import java.util.ArrayList;
 public class IceStunBindingTransaction extends StunBindingTransaction {
 
     private final int reflexPri;
-    private final RTCIceRole role;
+    private RTCIceRole role;
     private final long tiebreaker;
     private final String outboundUser;
 
@@ -75,6 +75,24 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
                 }
             } else {
                 Log.debug("Ignored incomplete response");
+            }
+        } else if (r instanceof StunErrorResponse){
+            StunErrorResponse error = (StunErrorResponse) r;
+            if (error.hasRequiredAttributes()){
+                StunAttribute ecodat = error.getAttributeByName("ERROR-CODE");
+                if (ecodat != null){
+                    StunAttribute.ErrorAttribute e = ecodat.getError();
+                    Log.warn("Error received "+e);
+                    if (e.code == 87){
+                        // role conflict
+                        if (onerror != null) {
+                            onerror.onEvent(e);
+                        }
+                        if (role == role.CONTROLLING){
+                            role = role.CONTROLLED;
+                        }
+                    }
+                }
             }
         } else {
             Log.warn("unexpected packet type into StunBinding transaction " + r.getClass().getSimpleName());

@@ -11,8 +11,10 @@ import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
+import com.ipseorama.slice.stun.StunAttribute;
 import com.ipseorama.slice.stun.StunBindingRequest;
 import com.ipseorama.slice.stun.StunBindingTransaction;
+import com.ipseorama.slice.stun.StunErrorTransaction;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransaction;
 import com.ipseorama.slice.stun.StunTransactionManager;
@@ -215,7 +217,34 @@ public class RTCIceTransport {
                         Log.verb("create pair " + inbound.toString() + " ipv" + ipv);
                     }
                     if (role == RTCIceRole.CONTROLLED) {
-                        inbound.setNominated(p.hasAttribute("USE-CANDIDATE"));
+                        if (sbr.hasAttribute("ICE-CONTROLLED")) {
+                            //eeek. clash of roles.
+                            boolean big = !sbr.localAgentHasBiggerTieBreaker(this.tieBreaker, "ICE-CONTROLLED");
+                            if (big) {
+                                StunErrorTransaction err = new StunErrorTransaction(sbr);
+                                ret.add(err);
+                                /*----> Early return*/
+                                return ret;
+                            } else {
+                                role = RTCIceRole.CONTROLLING;
+                            }
+                        } else {
+                            inbound.setNominated(p.hasAttribute("USE-CANDIDATE"));
+                        }
+                    }
+                    if (role == RTCIceRole.CONTROLLING) {
+                        if (sbr.hasAttribute("ICE-CONTROLLING")) {
+                            //eeek. clash of roles.
+                            boolean big = sbr.localAgentHasBiggerTieBreaker(this.tieBreaker, "ICE-CONTROLLING");
+                            if (big) {
+                                StunErrorTransaction err = new StunErrorTransaction(sbr);
+                                ret.add(err);
+                                /*----> Early return*/
+                                return ret;
+                            } else {
+                                role = RTCIceRole.CONTROLLED;
+                            }
+                        }
                     }
                     //to do: some state update on the pair here.
                     StunBindingTransaction replyTrans = new StunBindingTransaction(sbr);
@@ -233,6 +262,9 @@ public class RTCIceTransport {
                             Log.verb("triggered Rtans check complete. do something here....");
                             //to do: some state update on the pair here.
                             mypair.updateState(e);
+                        };
+                        triggeredTrans.onerror = (RTCEventData e) -> {
+                            onError(e);
                         };
                     } else {
                         Log.verb("Candidate Pair already SUCCEEDED no need to trigger -" + inbound);
@@ -298,19 +330,19 @@ public class RTCIceTransport {
         //Log.verb("selected pair          "+ret);
         //Log.verb("old selected pair was  "+selectedPair);
         if (ret != selectedPair) {
-            Log.debug("have new selected pair "+ret);
-            Log.debug("old selected pair was  "+selectedPair);
+            Log.debug("have new selected pair " + ret);
+            Log.debug("old selected pair was  " + selectedPair);
 
             if (selectedPair == null) {
                 this.setState(RTCIceTransportState.CONNECTED);
             }
-            if (ret == null){
+            if (ret == null) {
                 this.setState(RTCIceTransportState.DISCONNECTED);
             }
             selectedPair = ret;
-            dtlsTo = new InetSocketAddress(selectedPair.getRemote().getIp(),selectedPair.getRemote().getPort());
-            if (null != this.oncandidatepairchange){
-                 oncandidatepairchange.onEvent(selectedPair);
+            dtlsTo = new InetSocketAddress(selectedPair.getRemote().getIp(), selectedPair.getRemote().getPort());
+            if (null != this.oncandidatepairchange) {
+                oncandidatepairchange.onEvent(selectedPair);
             }
         }
         return ret;
@@ -321,15 +353,24 @@ public class RTCIceTransport {
     }
 
     public void sendDtlsPkt(byte[] buf, int off, int len) {
-        Log.debug("Will send dtls packet to "+dtlsTo);
+        Log.debug("Will send dtls packet to " + dtlsTo);
         IceEngine ice = this.iceGatherer.getIceEngine();
-        
-        
-        ice.sendTo(buf,off,len,dtlsTo);
+
+        ice.sendTo(buf, off, len, dtlsTo);
         // use selectedPair  to send packet.
     }
 
-
-
+    public void onError(RTCEventData e) {
+        Log.warn("triggered Rtans error");
+        if ((e != null) && (e instanceof StunAttribute.ErrorAttribute)) {
+            StunAttribute.ErrorAttribute er = (StunAttribute.ErrorAttribute) e;
+            if (er.code == 87) {
+                if (this.role == role.CONTROLLING) {
+                    Log.warn("Swapping roles....");
+                    this.role = role.CONTROLLED;
+                }
+            }
+        }
+    }
 
 }
