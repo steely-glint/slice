@@ -353,7 +353,7 @@ public class RTCIceTransport {
     }
 
     public void sendDtlsPkt(byte[] buf, int off, int len) {
-        Log.debug("Will send dtls packet to " + dtlsTo);
+        Log.verb("Will send dtls packet to " + dtlsTo);
         IceEngine ice = this.iceGatherer.getIceEngine();
 
         ice.sendTo(buf, off, len, dtlsTo);
