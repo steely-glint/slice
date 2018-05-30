@@ -28,6 +28,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -363,6 +364,11 @@ For incoming connectivity checks that pass validation,
                                         if (ref.getAddress() instanceof java.net.Inet4Address){
                                             cand4.setIpVersion(4);
                                         }
+                                        Optional<RTCIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {return l.getIpVersion() == cand4.getIpVersion(); }).findFirst();
+                                        lad.ifPresent((RTCIceCandidate l)-> {
+                                            cand4.setRelatedAddress(l.getIp());
+                                            cand4.setRelatedPort(l.getPort());
+                                        });
                                         addLocalCandidate(cand4);
                                     }
                                 }
