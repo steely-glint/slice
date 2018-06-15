@@ -43,6 +43,7 @@ public class ThreadedIceEngine implements IceEngine {
             throw new java.lang.IllegalStateException("Can't start a Threaded Ice engine more than once.");
         }
         _sock = ds;
+        int port = ds.getLocalPort();
         _trans = tm;
         if ((_sock == null) || (_trans == null)) {
             throw new java.lang.IllegalArgumentException("Need non-null socket and transaction manager to start");
@@ -52,13 +53,13 @@ public class ThreadedIceEngine implements IceEngine {
 
             rcvloop();
         };
-        _rcv = new Thread(ior, "ice-rcvr --<<--");
+        _rcv = new Thread(ior, "ice-rcvr("+port+") --<<--");
         _rcv.setPriority(Thread.MAX_PRIORITY);
         _rcv.start();
         Runnable ios = () -> {
             sendloop();
         };
-        _send = new Thread(ios, "ice-send -->>--");
+        _send = new Thread(ios, "ice-send("+port+") -->>--");
         _send.start();
         _started = true;
 
