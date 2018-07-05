@@ -204,9 +204,9 @@ public class StunPacket {
                 }
             }
             if (username == null) {
-                Log.warn("no username attribute in this packet");
+                Log.debug("no username attribute in this packet");
                 if (st != null) {
-                    Log.warn("looking in transaction");
+                    Log.debug("looking in transaction");
                     username = st.getUserName();
                     Log.verb("found username in transaction " + username);
                 }
@@ -230,7 +230,7 @@ public class StunPacket {
                     });
                 }
             } else {
-                Log.warn("no username attribute in this packet or transaction" );
+                Log.debug("no username attribute in this packet or transaction" );
             }
             if (pass != null) {
                 ret = pass.getBytes();
@@ -240,10 +240,10 @@ public class StunPacket {
                     ret = md5.digest(ret);
                 }
             } else {
-                Log.warn("no matching pass found");
+                Log.debug("no matching pass found");
             }
         } else {
-            Log.warn("no attributes in this packet");
+            Log.debug("no attributes in this packet");
         }
         return ret;
     }

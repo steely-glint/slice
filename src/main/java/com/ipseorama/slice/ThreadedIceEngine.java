@@ -34,6 +34,7 @@ public class ThreadedIceEngine implements IceEngine {
     private Thread _rcv;
     private boolean _started = false;
     static int POLL = 1000;
+    static int MAXSILENCE = 40;
     static int Ta = 10;
     private Map<String, String> miPass = new HashMap();
     private RTCIceCandidatePair selected;
@@ -96,6 +97,7 @@ public class ThreadedIceEngine implements IceEngine {
     private void rcvloop() {
         try {
             byte[] recbuf = new byte[StunPacket.MTU];
+            int timeoutCount = 0;
             _sock.setSoTimeout(POLL);
             InetSocketAddress near = (InetSocketAddress) _sock.getLocalSocketAddress();
             while (_rcv != null) {
@@ -146,23 +148,34 @@ public class ThreadedIceEngine implements IceEngine {
                             Log.verb("packet first byte "+b);
                         }
                     } catch (SocketTimeoutException t) {
-                        ;// don't care
+                        timeoutCount++;
+                        Log.verb("Timeout on packet rcv "+timeoutCount);
+
+                        if (timeoutCount > MAXSILENCE){
+                            Log.debug("Timeouts on packet rcv "+timeoutCount);
+                            Log.debug("assuming consent revoked");
+                            _rcv = null;
+                        }
                     }
                 } catch (Exception x) {
-                    Log.error("Exception in rcv loop");
+                    if (_sock.isClosed()){
+                        _rcv = null;
+                    }
+                    Log.debug("Exception in rcv loop");
                     if (Log.getLevel() >= Log.VERB) {
                         x.printStackTrace();
                     }
                 }
             }
             _send = null; // kill our partner
+            _trans.getTransport().disconnected(selected);
         } catch (SocketException ex) {
             Log.error("Can't set timer in rcv loop");
         }
     }
 
     private void sendloop() {
-        while (_rcv != null) {
+        while (_send != null) {
             try {
                 long now = System.currentTimeMillis();
                 List<StunPacket> tos = null;
@@ -226,4 +239,8 @@ public class ThreadedIceEngine implements IceEngine {
         }
     }
 
+    public void stop(){
+        _send = null;
+        _rcv = null;        
+    }
 }

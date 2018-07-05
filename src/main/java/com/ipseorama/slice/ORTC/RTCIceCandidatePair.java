@@ -27,6 +27,7 @@ public class RTCIceCandidatePair implements RTCEventData {
     private boolean nominated;
     public EventHandler onDtls;
     public EventHandler onRTP;
+    public EventHandler onRevoke;
 
     RTCIceCandidatePair(RTCIceCandidate local, RTCIceCandidate remote) {
         this.local = local;
@@ -188,6 +189,15 @@ A check for this pair hasn't been performed, and it can't yet be performed until
             Log.verb("fired onEvent srtp packet ");
         } else {
             Log.debug("dumping rtp packet - no place to push it.");
+        }
+    }
+
+    public void onRevoke() {
+        if (onRevoke != null) {
+            onRevoke.onEvent(null);
+            Log.verb("fired onRevoke event ");
+        } else {
+            Log.debug("no one listening for onRevoke events");
         }
     }
 

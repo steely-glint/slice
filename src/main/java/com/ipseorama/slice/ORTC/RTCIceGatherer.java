@@ -78,6 +78,9 @@ For incoming connectivity checks that pass validation,
     }
 
     public void close() {
+        if ((_sock != null) &&  (!_sock.isClosed())){
+            _sock.close();
+        }
     }
 
     void gatherLocals() {
