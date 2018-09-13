@@ -54,13 +54,13 @@ public class ThreadedIceEngine implements IceEngine {
 
             rcvloop();
         };
-        _rcv = new Thread(ior, "ice-rcvr("+port+") --<<--");
+        _rcv = new Thread(ior, "ice-rcvr(" + port + ") --<<--");
         _rcv.setPriority(Thread.MAX_PRIORITY);
         _rcv.start();
         Runnable ios = () -> {
             sendloop();
         };
-        _send = new Thread(ios, "ice-send("+port+") -->>--");
+        _send = new Thread(ios, "ice-send(" + port + ") -->>--");
         _send.start();
         _started = true;
 
@@ -133,32 +133,35 @@ public class ThreadedIceEngine implements IceEngine {
                             synchronized (_trans) {
                                 _trans.notifyAll();
                             }
-                        } else 
-                        if ((19 < b) && (b < 64)) {
-                            Log.debug("push inbound DTLS packet");
-                            if (selected != null) {
-                                selected.pushDTLS(rec, near, far);
-                            } else {
-                                Log.debug("dumping DTLS packet - no selected pair - yet...");
-                            }
-                        }else 
-                        if (b < 0) {
-                            selected.pushRTP(dgp);
                         } else {
-                            Log.verb("packet first byte "+b);
+                            if ((19 < b) && (b < 64)) {
+                                Log.debug("push inbound DTLS packet");
+                                if (selected != null) {
+                                    selected.pushDTLS(rec, near, far);
+                                } else {
+                                    Log.debug("dumping DTLS packet - no selected pair - yet...");
+                                }
+                            } else {
+                                if (b < 0) {
+                                    selected.pushRTP(dgp);
+                                } else {
+                                    Log.verb("packet first byte " + b);
+                                }
+                            }
                         }
+                        timeoutCount = 0;
                     } catch (SocketTimeoutException t) {
                         timeoutCount++;
-                        Log.verb("Timeout on packet rcv "+timeoutCount);
+                        Log.verb("Timeout on packet rcv " + timeoutCount);
 
-                        if (timeoutCount > MAXSILENCE){
-                            Log.debug("Timeouts on packet rcv "+timeoutCount);
+                        if (timeoutCount > MAXSILENCE) {
+                            Log.debug("Timeouts on packet rcv " + timeoutCount);
                             Log.debug("assuming consent revoked");
                             _rcv = null;
                         }
                     }
                 } catch (Exception x) {
-                    if (_sock.isClosed()){
+                    if (_sock.isClosed()) {
                         _rcv = null;
                     }
                     Log.debug("Exception in rcv loop");
@@ -239,8 +242,8 @@ public class ThreadedIceEngine implements IceEngine {
         }
     }
 
-    public void stop(){
+    public void stop() {
         _send = null;
-        _rcv = null;        
+        _rcv = null;
     }
 }
