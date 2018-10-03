@@ -30,6 +30,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     private char relatedPort;
     private int generation;
     private int ipVersion = 6;
+    private int mtu;
 
     static RTCIceCandidate mkTempCandidate(InetSocketAddress isoc, RTCIceProtocol prot, int ipversion, long pri) {
         InetAddress home = isoc.getAddress();
@@ -308,5 +309,9 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     boolean sameSocketAddress(InetSocketAddress sa) {
         boolean ret = this.getIp().equals(sa.getAddress()) && this.getPort() == sa.getPort();
         return ret;
+    }
+
+    void setMTU(int m) {
+        mtu = m;
     }
 }

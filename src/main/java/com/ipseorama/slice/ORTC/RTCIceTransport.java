@@ -378,4 +378,11 @@ public class RTCIceTransport {
         this.setState(RTCIceTransportState.DISCONNECTED);
     }
 
+    public int getMTU() {
+        IceEngine ice = this.iceGatherer.getIceEngine();
+        return ice.getMTU();
+    }
+
+
+
 }

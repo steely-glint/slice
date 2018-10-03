@@ -13,11 +13,14 @@ import com.phono.srtplight.Log;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -36,6 +39,7 @@ public class ThreadedIceEngine implements IceEngine {
     static int POLL = 1000;
     static int MAXSILENCE = 40;
     static int Ta = 10;
+    private int mtu = StunPacket.MTU;
     private Map<String, String> miPass = new HashMap();
     private RTCIceCandidatePair selected;
 
@@ -45,6 +49,19 @@ public class ThreadedIceEngine implements IceEngine {
         }
         _sock = ds;
         int port = ds.getLocalPort();
+        try {
+            NetworkInterface ni = NetworkInterface.getByInetAddress(ds.getLocalAddress());
+            if (ni != null) {
+                int m = ni.getMTU();
+
+                Log.debug(" MTU is " + m);
+                if ((m > 100) && (m < 2000)) {
+                    mtu = m;
+                }
+            }
+        } catch (SocketException ex) {
+            Log.debug("Can't figure out MTU");
+        }
         _trans = tm;
         if ((_sock == null) || (_trans == null)) {
             throw new java.lang.IllegalArgumentException("Need non-null socket and transaction manager to start");
@@ -96,7 +113,7 @@ public class ThreadedIceEngine implements IceEngine {
      */
     private void rcvloop() {
         try {
-            byte[] recbuf = new byte[StunPacket.MTU];
+            byte[] recbuf = new byte[mtu];
             int timeoutCount = 0;
             _sock.setSoTimeout(POLL);
             InetSocketAddress near = (InetSocketAddress) _sock.getLocalSocketAddress();
@@ -133,21 +150,17 @@ public class ThreadedIceEngine implements IceEngine {
                             synchronized (_trans) {
                                 _trans.notifyAll();
                             }
-                        } else {
-                            if ((19 < b) && (b < 64)) {
-                                Log.debug("push inbound DTLS packet");
-                                if (selected != null) {
-                                    selected.pushDTLS(rec, near, far);
-                                } else {
-                                    Log.debug("dumping DTLS packet - no selected pair - yet...");
-                                }
+                        } else if ((19 < b) && (b < 64)) {
+                            Log.debug("push inbound DTLS packet");
+                            if (selected != null) {
+                                selected.pushDTLS(rec, near, far);
                             } else {
-                                if (b < 0) {
-                                    selected.pushRTP(dgp);
-                                } else {
-                                    Log.verb("packet first byte " + b);
-                                }
+                                Log.debug("dumping DTLS packet - no selected pair - yet...");
                             }
+                        } else if (b < 0) {
+                            selected.pushRTP(dgp);
+                        } else {
+                            Log.verb("packet first byte " + b);
                         }
                         timeoutCount = 0;
                     } catch (SocketTimeoutException t) {
@@ -245,5 +258,9 @@ public class ThreadedIceEngine implements IceEngine {
     public void stop() {
         _send = null;
         _rcv = null;
+    }
+
+    public int getMTU() {
+        return mtu;
     }
 }

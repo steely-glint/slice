@@ -78,7 +78,7 @@ For incoming connectivity checks that pass validation,
     }
 
     public void close() {
-        if ((_sock != null) &&  (!_sock.isClosed())){
+        if ((_sock != null) && (!_sock.isClosed())) {
             _sock.close();
         }
     }
@@ -96,12 +96,14 @@ For incoming connectivity checks that pass validation,
         try {
             Enumeration nifs = NetworkInterface.getNetworkInterfaces();
             int i = 0;
+            int mtu = 1400;
             int lpref = Character.MAX_VALUE;
             while (nifs.hasMoreElements()) {
                 NetworkInterface ni = (NetworkInterface) nifs.nextElement();
                 byte[] hw = ni.getHardwareAddress();
                 Log.debug("Adding interface: " + ni.getDisplayName());
                 if (ni.isUp()) {
+                    mtu = ni.getMTU();
                     Enumeration ipads = ni.getInetAddresses();
                     List<InterfaceAddress> iads = ni.getInterfaceAddresses();
                     Inet4Address home = null;
@@ -148,7 +150,7 @@ For incoming connectivity checks that pass validation,
                                 (char) _sock.getLocalPort(),
                                 RTCIceCandidateType.HOST,
                                 null);
-                        
+                        cand6.setMTU(mtu);
                         addLocalCandidate(cand6);
                     }
                     if (home != null) {
@@ -164,6 +166,7 @@ For incoming connectivity checks that pass validation,
                                 RTCIceCandidateType.HOST,
                                 null);
                         cand4.setIpVersion(4);
+                        cand4.setMTU(mtu);
                         addLocalCandidate(cand4);
                     }
 
@@ -204,7 +207,7 @@ For incoming connectivity checks that pass validation,
         RTCIceGatherPolicy policy = options.getGatherPolicy();
         List<RTCIceServer> servers = options.getIceServers();
         if ((_ice != null) && (!_ice.isStarted())) {
-            _ice.start(_sock, _stm);            
+            _ice.start(_sock, _stm);
         }
         switch (policy) {
             case NOHOST:
@@ -226,10 +229,10 @@ For incoming connectivity checks that pass validation,
         return _localParams;
     }
 
-    public void setLocalParameters(RTCIceParameters local){
+    public void setLocalParameters(RTCIceParameters local) {
         _localParams = local;
     }
-    
+
     List<RTCIceCandidate> getLocalCandidates() {
         return _localCandidates;
     }
@@ -364,11 +367,13 @@ For incoming connectivity checks that pass validation,
                                                 null);
                                         cand4.setRelatedAddress(raddr.getHostAddress());
                                         cand4.setRelatedPort(rport);
-                                        if (ref.getAddress() instanceof java.net.Inet4Address){
+                                        if (ref.getAddress() instanceof java.net.Inet4Address) {
                                             cand4.setIpVersion(4);
                                         }
-                                        Optional<RTCIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {return l.getIpVersion() == cand4.getIpVersion(); }).findFirst();
-                                        lad.ifPresent((RTCIceCandidate l)-> {
+                                        Optional<RTCIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {
+                                            return l.getIpVersion() == cand4.getIpVersion();
+                                        }).findFirst();
+                                        lad.ifPresent((RTCIceCandidate l) -> {
                                             cand4.setRelatedAddress(l.getIp());
                                             cand4.setRelatedPort(l.getPort());
                                         });
@@ -393,7 +398,8 @@ For incoming connectivity checks that pass validation,
     public void setIceEngine(IceEngine tie) {
         _ice = tie;
     }
-    public IceEngine getIceEngine(){
+
+    public IceEngine getIceEngine() {
         return _ice;
     }
 

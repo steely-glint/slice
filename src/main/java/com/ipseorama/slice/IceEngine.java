@@ -20,8 +20,11 @@ public interface IceEngine {
     public boolean isStarted();
 
     public void addIceCreds(String user, String pass);
-    public StunTransactionManager getTransactionManager() ;
+
+    public StunTransactionManager getTransactionManager();
 
     public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo);
+
+    public int getMTU();
 
 }
