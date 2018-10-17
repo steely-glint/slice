@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.ORTC;
 
+import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.stun.IceStunBindingTransaction;
@@ -28,6 +29,7 @@ public class RTCIceCandidatePair implements RTCEventData {
     public EventHandler onDtls;
     public EventHandler onRTP;
     public EventHandler onRevoke;
+    private boolean triggerHadUseCandidateSet;
 
     RTCIceCandidatePair(RTCIceCandidate local, RTCIceCandidate remote) {
         this.local = local;
@@ -84,7 +86,10 @@ public class RTCIceCandidatePair implements RTCEventData {
     }
 
     StunTransaction trigger(RTCIceTransport trans) {
+        this.triggerHadUseCandidateSet = nominated;
         StunTransaction ret = createTransaction(trans, "outbound triggered");
+        Log.debug("Triggering new check "+ret+" with nomination "+nominated);
+
         return ret;
     }
 
@@ -98,16 +103,19 @@ public class RTCIceCandidatePair implements RTCEventData {
         int port = (int) this.remote.getPort();
         RTCIceRole role = trans.getRole();
         long reflexPri = priority(role);
+        IceEngine ice = trans.iceGatherer.getIceEngine();
 
         long tiebreaker = trans.getTieBreaker();
         String outboundUser = trans.getRemoteParameters().usernameFragment + ":" + trans.getLocalParameters().usernameFragment;
 
-        IceStunBindingTransaction ret = new IceStunBindingTransaction(host, port,
+        boolean mayNominate = (trans.selectedPair == null);
+        IceStunBindingTransaction ret = new IceStunBindingTransaction(ice, host, port,
                 (int) reflexPri,
                 role,
                 tiebreaker,
-                outboundUser);
+                outboundUser,mayNominate);
         ret.setCause(cause);
+        ret.setPair(this);
         return ret;
     }
 
@@ -154,7 +162,10 @@ A check for this pair hasn't been performed, and it can't yet be performed until
                     this.nominated = true;
                 }
             }
-
+            if (this.state == RTCIceCandidatePairState.INPROGRESS){
+                this.nominated = triggerHadUseCandidateSet;
+                Log.debug("using nomination status from trigger");
+            }
             this.setState(RTCIceCandidatePairState.SUCCEEDED);
         }
     }

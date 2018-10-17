@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
@@ -32,9 +33,45 @@ public class SimpleStunClient extends StunBindingTransaction {
     }
     private boolean unanswered = true;
     private StunTransactionManager stm;
+    static IceEngine dummyEngine = new IceEngine(){
+        @Override
+        public void start(DatagramSocket ds, StunTransactionManager tm) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
 
+        @Override
+        public boolean isStarted() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void addIceCreds(String user, String pass) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public StunTransactionManager getTransactionManager() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public int getMTU() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public long nextAvailableTime() {
+            return System.currentTimeMillis();
+        }
+        
+    };
     public SimpleStunClient(String host, int port) {
-        super(host, port);
+        super(dummyEngine, host, port);
         stm = new StunTransactionManager();
         stm.addTransaction(this);
     }

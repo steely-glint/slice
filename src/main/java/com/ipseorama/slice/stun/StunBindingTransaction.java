@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.phono.srtplight.Log;
@@ -22,18 +23,21 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     protected InetSocketAddress _ref;
     StunBindingRequest inbound = null;
     StunBindingResponse response;
+    IceEngine ice;
 
-    public StunBindingTransaction(String host, int port) {
+    public StunBindingTransaction(IceEngine e, String host, int port) {
         super();
         _far = new InetSocketAddress(host, port);
-        dueTime = System.currentTimeMillis();
+        ice = e;
+        dueTime = ice.nextAvailableTime();
     }
 
-    public StunBindingTransaction(StunBindingRequest sbreq) {
+    public StunBindingTransaction(IceEngine e,StunBindingRequest sbreq) {
         super(sbreq);
         _far = sbreq.getFar();
         inbound = sbreq;
-        dueTime = System.currentTimeMillis() - 10;
+        ice = e;
+        dueTime = ice.nextAvailableTime();
     }
 
     public InetSocketAddress getFar() {
@@ -68,7 +72,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
                 bind = new StunBindingRequest();
                 bind.setTid(this.getTid());
                 bind.setFar(_far);
-                dueTime = System.currentTimeMillis() + (TIMEOUT * retries++);
+                dueTime = ice.nextAvailableTime() + (TIMEOUT * retries++);
             }
         } else {
             // someone sent us a request.

@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.phono.srtplight.Log;
@@ -22,12 +23,14 @@ public class StunErrorTransaction extends StunTransaction implements RTCEventDat
     protected InetSocketAddress _ref;
     StunBindingRequest inbound = null;
     StunErrorResponse response;
+    IceEngine ice;
 
-    public StunErrorTransaction(StunBindingRequest sbreq) {
+    public StunErrorTransaction(IceEngine e, StunBindingRequest sbreq) {
         super(sbreq);
         _far = sbreq.getFar();
         inbound = sbreq;
-        dueTime = System.currentTimeMillis() - 10;
+        ice = e;
+        dueTime = ice.nextAvailableTime();
     }
 
     public InetSocketAddress getFar() {

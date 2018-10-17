@@ -5,8 +5,10 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.phono.srtplight.Log;
+import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -31,6 +33,8 @@ import static org.junit.Assert.*;
  */
 public class IceStunBindingTransactionTest {
 
+    private static IceEngine dummyIce;
+
     public IceStunBindingTransactionTest() {
     }
     Map<String, String> passwords
@@ -49,6 +53,42 @@ public class IceStunBindingTransactionTest {
     @BeforeClass
     public static void setUpClass() {
         Log.setLevel(Log.DEBUG);
+        dummyIce = new IceEngine() {
+            @Override
+            public void start(DatagramSocket ds, StunTransactionManager tm) {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            public boolean isStarted() {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            public void addIceCreds(String user, String pass) {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            public StunTransactionManager getTransactionManager() {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            public int getMTU() {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            public long nextAvailableTime() {
+                return 0L;
+            }
+        };
     }
 
     @AfterClass
@@ -79,11 +119,11 @@ public class IceStunBindingTransactionTest {
             RTCIceRole role = RTCIceRole.CONTROLLING;
             long tiebreaker = 123456789;
             String outboundUser = "6hg:6hg";
-            IceStunBindingTransaction instance = new IceStunBindingTransaction(host, port,
+            IceStunBindingTransaction instance = new IceStunBindingTransaction(dummyIce,host, port,
                     reflexPri,
                     role,
                     tiebreaker,
-                    outboundUser);
+                    outboundUser,true);
             StunPacket send = instance.buildOutboundPacket();
             byte[] wire = send.outboundBytes("4vc3fb0dshp2lhs6ekne716q0v".getBytes());
             StunPacket rcv = StunPacket.mkStunPacket(wire, passwords,near);

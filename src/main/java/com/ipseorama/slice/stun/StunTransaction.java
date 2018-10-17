@@ -6,6 +6,7 @@
 package com.ipseorama.slice.stun;
 
 import com.ipseorama.slice.ORTC.EventHandler;
+import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import java.math.BigInteger;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -82,6 +83,8 @@ public abstract class StunTransaction {
     public String toString(){
         return "{"+cause+"} stun Transaction type "+this.getClass().getSimpleName()+" complete="+this.isComplete()+ "tid ="+ StunPacket.hexString(id);
     }
+
+
 
 
 }

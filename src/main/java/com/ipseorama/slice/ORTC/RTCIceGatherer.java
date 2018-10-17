@@ -337,7 +337,7 @@ For incoming connectivity checks that pass validation,
                             host = bits[0];
                         }
                         if (host != null) {
-                            StunBindingTransaction sbt = new StunBindingTransaction(host, port);
+                            StunBindingTransaction sbt = new StunBindingTransaction(_ice, host, port);
                             sbt.setCause("outbound gather");
 
                             sbt.oncomplete = (RTCEventData e) -> {

@@ -46,6 +46,7 @@ public class RTCIceTransport {
     private long tieBreaker;
     private StunTransactionManager transMan;
     private InetSocketAddress dtlsTo;
+    private IceEngine ice;
 
     public RTCIceTransportState getRTCIceTransportState() {
         return state;
@@ -62,7 +63,7 @@ public class RTCIceTransport {
     public void start(RTCIceGatherer gatherer, RTCIceParameters remoteParameters, RTCIceRole role) {
         // for the moment we will ignore the new values and assume that the constructor was right....
         // and ignore the re-start semantics.
-        IceEngine ice = gatherer.getIceEngine();
+        ice = gatherer.getIceEngine();
 
         this.transMan = gatherer.getStunTransactionManager();
         transMan.setTransport(this);
@@ -180,7 +181,8 @@ public class RTCIceTransport {
     }
 
     public RTCIceCandidatePair nextCheck() {
-        Optional<RTCIceCandidatePair> ret = candidatePairs.stream()
+        List<RTCIceCandidatePair> scp = candidatePairs;
+        Optional<RTCIceCandidatePair> ret = scp.stream()
                 .sorted(ordering)
                 .limit(MAXCHECKS)
                 .filter((RTCIceCandidatePair icp) -> {
@@ -201,16 +203,21 @@ public class RTCIceTransport {
      */
     public List<StunTransaction> received(StunPacket p, RTCIceProtocol prot, int ipv) {
         List<StunTransaction> ret = null;
+
         if (p instanceof StunBindingRequest) {
             // todo someone should check that the name/pass is right - who and how ?
             // check for required attributes.
 
             final StunBindingRequest sbr = (StunBindingRequest) p;
-
+            
             if (sbr.hasRequiredIceAttributes()) {
                 ret = new ArrayList();
                 if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
                     RTCIceCandidatePair inbound = findMatchingPair(sbr, prot, ipv);
+                    if ((this.selectedPair != null ) && (inbound != selectedPair)){
+                        Log.verb("We have a selected pair - ignoring this..."+sbr);
+                        return (ret);
+                    }
                     if (inbound == null) {
                         Log.verb("about to mkpair from " + sbr.toString() + " ipv" + ipv);
                         inbound = mkPair(sbr, prot, ipv);
@@ -221,7 +228,7 @@ public class RTCIceTransport {
                             //eeek. clash of roles.
                             boolean big = !sbr.localAgentHasBiggerTieBreaker(this.tieBreaker, "ICE-CONTROLLED");
                             if (big) {
-                                StunErrorTransaction err = new StunErrorTransaction(sbr);
+                                StunErrorTransaction err = new StunErrorTransaction(ice, sbr);
                                 ret.add(err);
                                 /*----> Early return*/
                                 return ret;
@@ -237,7 +244,7 @@ public class RTCIceTransport {
                             //eeek. clash of roles.
                             boolean big = sbr.localAgentHasBiggerTieBreaker(this.tieBreaker, "ICE-CONTROLLING");
                             if (big) {
-                                StunErrorTransaction err = new StunErrorTransaction(sbr);
+                                StunErrorTransaction err = new StunErrorTransaction(ice, sbr);
                                 ret.add(err);
                                 /*----> Early return*/
                                 return ret;
@@ -247,7 +254,7 @@ public class RTCIceTransport {
                         }
                     }
                     //to do: some state update on the pair here.
-                    StunBindingTransaction replyTrans = new StunBindingTransaction(sbr);
+                    StunBindingTransaction replyTrans = new StunBindingTransaction(ice, sbr);
                     replyTrans.setCause("inbound");
                     Log.verb("adding " + replyTrans.toString() + " to do reply");
                     ret.add(replyTrans);
@@ -259,8 +266,9 @@ public class RTCIceTransport {
                         final RTCIceCandidatePair mypair = inbound;
                         mypair.setState(RTCIceCandidatePairState.INPROGRESS);
                         triggeredTrans.oncomplete = (RTCEventData e) -> {
-                            Log.verb("triggered Rtans check complete. do something here....");
+                            Log.verb("triggered Rtans check complete. do something here "+triggeredTrans);
                             //to do: some state update on the pair here.
+                            
                             mypair.updateState(e);
                         };
                         triggeredTrans.onerror = (RTCEventData e) -> {
@@ -269,6 +277,7 @@ public class RTCIceTransport {
                     } else {
                         Log.verb("Candidate Pair already SUCCEEDED no need to trigger -" + inbound);
                     }
+
                 } else {
                     Log.verb("Ignored bining transaction - wrong user");
                 }
@@ -277,14 +286,14 @@ public class RTCIceTransport {
         return ret;
     }
 
-    private RTCIceCandidatePair findMatchingPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
+    public RTCIceCandidatePair findMatchingPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
         /*InetSocketAddress near = p.getNear();
         InetSocketAddress far = p.getFar();*/
         long pri = p.getPriority();
         RTCIceCandidate t_near = RTCIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri);
         RTCIceCandidate t_far = RTCIceCandidate.mkTempCandidate(p.getFar(), prot, ipv, pri);
-
-        Optional<RTCIceCandidatePair> cp = this.candidatePairs.stream().filter((RTCIceCandidatePair icp) -> {
+        List<RTCIceCandidatePair> scp = this.candidatePairs;
+        Optional<RTCIceCandidatePair> cp = scp.stream().filter((RTCIceCandidatePair icp) -> {
             return icp.sameEnough(t_near, t_far);
         }).findAny();
         return cp.isPresent() ? cp.get() : null;
@@ -303,7 +312,9 @@ public class RTCIceTransport {
         }).findAny();
         RTCIceCandidate near = nopt.orElse(t_near);
         RTCIceCandidatePair ret = new RTCIceCandidatePair(near, far);
-        candidatePairs.add(ret);
+        synchronized (candidatePairs) {
+            candidatePairs.add(ret);
+        }
         return ret;
     }
 
@@ -323,7 +334,8 @@ public class RTCIceTransport {
     }
 
     public RTCIceCandidatePair findValidNominatedPair() {
-        Optional<RTCIceCandidatePair> npair = this.candidatePairs.stream().filter((RTCIceCandidatePair r) -> {
+        List<RTCIceCandidatePair> scp = this.candidatePairs;
+        Optional<RTCIceCandidatePair> npair = scp.stream().filter((RTCIceCandidatePair r) -> {
             return r.isNominated() && r.getState() == RTCIceCandidatePairState.SUCCEEDED;
         }).findAny(); // strictly we should order this by priority and _find first_
         RTCIceCandidatePair ret = npair.isPresent() ? npair.get() : null;
@@ -334,6 +346,7 @@ public class RTCIceTransport {
             Log.debug("old selected pair was  " + selectedPair);
 
             if (selectedPair == null) {
+                this.pruneExcept(ret);
                 this.setState(RTCIceTransportState.CONNECTED);
             }
             if (ret == null) {
@@ -374,7 +387,7 @@ public class RTCIceTransport {
     }
 
     public void disconnected(RTCIceCandidatePair selected) {
-        Log.debug("IceTransport disconnected ...beacuse no packets received on "+selected.toString() );
+        Log.debug("IceTransport disconnected ...beacuse no packets received on " + selected.toString());
         this.setState(RTCIceTransportState.DISCONNECTED);
     }
 
@@ -383,6 +396,13 @@ public class RTCIceTransport {
         return ice.getMTU();
     }
 
-
-
+    public void pruneExcept(RTCIceCandidatePair sp) {
+        if (sp != null) {
+            transMan.pruneExcept(sp);
+            ArrayList<RTCIceCandidatePair> nsp = new ArrayList<RTCIceCandidatePair>();
+            nsp.add(sp);
+            candidatePairs = nsp;
+            Log.debug("pruned candidate Pairs to _just_ selected pair");
+        }
+    }
 }

@@ -38,15 +38,17 @@ public class ThreadedIceEngine implements IceEngine {
     private boolean _started = false;
     static int POLL = 1000;
     static int MAXSILENCE = 40;
-    static int Ta = 10;
+    static int Ta = 5;
     private int mtu = StunPacket.MTU;
     private Map<String, String> miPass = new HashMap();
     private RTCIceCandidatePair selected;
+    long nextAvailableTime;
 
     public synchronized void start(DatagramSocket ds, StunTransactionManager tm) {
         if (_started) {
             throw new java.lang.IllegalStateException("Can't start a Threaded Ice engine more than once.");
         }
+        nextAvailableTime = System.currentTimeMillis();
         _sock = ds;
         int port = ds.getLocalPort();
         try {
@@ -82,7 +84,17 @@ public class ThreadedIceEngine implements IceEngine {
         _started = true;
 
     }
-
+    @Override 
+    public long nextAvailableTime(){
+        long now = System.currentTimeMillis();
+        if( nextAvailableTime < now){
+            nextAvailableTime = now;
+        }
+        long ret = nextAvailableTime;
+        nextAvailableTime += Ta;
+        return ret;
+    }
+    
     @Override
     public void addIceCreds(String user, String pass) {
         miPass.put(user, pass);
@@ -155,10 +167,16 @@ public class ThreadedIceEngine implements IceEngine {
                             if (selected != null) {
                                 selected.pushDTLS(rec, near, far);
                             } else {
+                                // strictly this is wrong - we should stack them...
                                 Log.debug("dumping DTLS packet - no selected pair - yet...");
                             }
                         } else if (b < 0) {
-                            selected.pushRTP(dgp);
+                            if (selected !=null){
+                                selected.pushRTP(dgp);
+                            } else {
+                                // strictly this is wrong - we should stack them...
+                                Log.debug("dumping RTP packet - no selected pair - yet...");
+                            }
                         } else {
                             Log.verb("packet first byte " + b);
                         }
@@ -178,8 +196,8 @@ public class ThreadedIceEngine implements IceEngine {
                         _rcv = null;
                     }
                     Log.debug("Exception in rcv loop");
-                    if (Log.getLevel() >= Log.VERB) {
-                        x.printStackTrace();
+                    if (Log.getLevel() >= Log.DEBUG) {
+                        x.printStackTrace(System.out);
                     }
                 }
             }
@@ -207,7 +225,7 @@ public class ThreadedIceEngine implements IceEngine {
                             DatagramPacket out = new DatagramPacket(o, 0, o.length, far);
                             _sock.send(out);
                             // rate limit this here....
-                            Thread.sleep(Ta);
+                            // Thread.sleep(Ta);
                         } else {
                             Log.verb("not sending packet to unresolved address");
                         }
@@ -224,9 +242,9 @@ public class ThreadedIceEngine implements IceEngine {
                 }
             } catch (Exception x) {
                 Log.error("Exception in loop" + x.getMessage());
-                if (Log.getLevel() >= Log.DEBUG) {
+                //if (Log.getLevel() >= Log.DEBUG) {
                     x.printStackTrace();
-                }
+                //}
             }
         }
         _rcv = null; // kill our partner

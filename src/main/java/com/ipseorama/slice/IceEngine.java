@@ -26,5 +26,8 @@ public interface IceEngine {
     public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo);
 
     public int getMTU();
+    
+    public long nextAvailableTime();
+
 
 }

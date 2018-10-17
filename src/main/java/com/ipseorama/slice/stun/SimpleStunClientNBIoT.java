@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
@@ -16,6 +17,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.util.Timer;
 
@@ -42,9 +44,45 @@ public class SimpleStunClientNBIoT extends StunBindingTransaction {
     private DataInputStream _itty;
 
     private DataOutputStream _otty;
+    static IceEngine dummyEngine = new IceEngine(){
+        @Override
+        public void start(DatagramSocket ds, StunTransactionManager tm) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
 
+        @Override
+        public boolean isStarted() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void addIceCreds(String user, String pass) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public StunTransactionManager getTransactionManager() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public int getMTU() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public long nextAvailableTime() {
+            return System.currentTimeMillis();
+        }
+        
+    };
     public SimpleStunClientNBIoT(String host, int port) {
-        super(host, port);
+        super(dummyEngine,host, port);
         byte[] nid =
         {(byte)0xB7,(byte)0xBB,(byte)0xE8,(byte)0xF2,(byte)0xD8,(byte)0x5C,(byte)0x5C,(byte)0x83,(byte)0x04,(byte)0xB8,(byte)0x26,(byte)0x1A};
         this.id = nid;

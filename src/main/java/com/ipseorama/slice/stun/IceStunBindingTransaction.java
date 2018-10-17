@@ -5,6 +5,8 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.IceEngine;
+import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.phono.srtplight.Log;
 import java.util.ArrayList;
@@ -19,17 +21,21 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
     private RTCIceRole role;
     private final long tiebreaker;
     private final String outboundUser;
+    private final boolean mayNominate;
+    private RTCIceCandidatePair candidatePair;
 
-    public IceStunBindingTransaction(String host, int port,
+    public IceStunBindingTransaction(IceEngine ice, String host, int port,
             int reflexPri,
             RTCIceRole role,
             long tiebreaker,
-            String outboundUser) {
-        super(host, port);
+            String outboundUser,
+    boolean mayNominate) {
+        super(ice, host, port);
         this.reflexPri = reflexPri;
         this.role = role;
         this.tiebreaker = tiebreaker;
         this.outboundUser = outboundUser;
+        this.mayNominate = mayNominate;
     }
 
     @Override
@@ -48,7 +54,7 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         StunAttribute.addUsername(attrs, outboundUser);
         StunAttribute.addSoftware(attrs);
         StunAttribute.addIceCon(attrs, role, tiebreaker);
-        if (role.equals(RTCIceRole.CONTROLLING)){
+        if (mayNominate && role.equals(RTCIceRole.CONTROLLING)){
             StunAttribute.addUseCandidate(attrs);
         }
         StunAttribute.addMessageIntegrity(attrs);
@@ -97,5 +103,12 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         } else {
             Log.warn("unexpected packet type into StunBinding transaction " + r.getClass().getSimpleName());
         }
+    }
+
+    public void setPair(RTCIceCandidatePair pair) {
+        candidatePair = pair;
+    }
+    public RTCIceCandidatePair getPair(){
+        return candidatePair;
     }
 }

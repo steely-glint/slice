@@ -78,6 +78,9 @@ public class StunTransactionManager {
                     for (StunTransaction tr : trans) {
                         values.add(tr);
                         Log.debug("added new transaction" + tr.toString());
+                        if (p.hasAttribute("USE_CANDIDATE")) {
+                            Log.debug("tid has USE_CANDIDATE set");
+                        }
                     }
                 } else {
                     Log.verb("didn't make transaction");
@@ -91,8 +94,8 @@ public class StunTransactionManager {
     /*synchronized*/ public void removeComplete() {
         values.removeIf((StunTransaction t) -> {
             boolean ret = t.isComplete();
-            if (ret){
-                Log.debug("removing " +t);
+            if (ret) {
+                Log.debug("removing " + t);
             }
             return ret;
         });
@@ -116,10 +119,14 @@ public class StunTransactionManager {
     }
 
     /*synchronized*/ public List<StunPacket> transact(long now) {
-        List<StunPacket> pkts = values.stream().filter((StunTransaction t) -> {
-            return (t != null) && !t.isComplete() && t.getDueTime() <= now;
-        }).map((StunTransaction t) -> {
-            Log.debug("Building packet for " + t.toString());
+        List<StunPacket> pkts = values.stream()
+                .sorted((StunTransaction a, StunTransaction b) -> {
+                    return (int) (a.dueTime - b.dueTime);
+                })
+                .filter((StunTransaction t) -> {
+                    return (t != null) && !t.isComplete() && t.getDueTime() <= now;
+                }).map((StunTransaction t) -> {
+            Log.debug("Building packet for " + t.toString() + "due at " + t.dueTime);
             return t.buildOutboundPacket();
         }).collect(Collectors.toList());
         return pkts;
@@ -161,6 +168,21 @@ public class StunTransactionManager {
         };
         Log.debug("Adding outbound transaction for " + p);
         addTransaction(transact);
+    }
+
+    public void pruneExcept(RTCIceCandidatePair sp) {
+        Log.debug("Prune Transacts. to just "+sp);
+        values.removeIf((StunTransaction sa) -> {
+            boolean ret = true;
+            if (sa instanceof IceStunBindingTransaction) {
+                if ((((IceStunBindingTransaction) sa).getPair()) == sp) {
+                    ret = false; // i.e. keep our pair
+                    Log.debug("----> keep "+sa);
+                }
+            }
+            Log.debug("remove "+sa+ " = "+ret );
+            return ret;
+        });
     }
 
 }
