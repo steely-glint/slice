@@ -19,8 +19,6 @@ import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -210,6 +208,7 @@ public class ThreadedIceEngine implements IceEngine {
 
     private void sendloop() {
         while (_send != null) {
+            int snooze = Ta;
             try {
                 long now = System.currentTimeMillis();
                 List<StunPacket> tos = null;
@@ -235,9 +234,10 @@ public class ThreadedIceEngine implements IceEngine {
                     selected = _trans.findValidNominatedPair();
                     _trans.removeComplete();
                     long next = _trans.nextDue();
-                    int snooze = (int) (next - now);
+                    snooze = (int) (next - now);
                     if (snooze > Ta) {
                         _trans.wait(snooze);
+                        snooze =0;
                     }
                 }
             } catch (Exception x) {
@@ -245,6 +245,10 @@ public class ThreadedIceEngine implements IceEngine {
                 //if (Log.getLevel() >= Log.DEBUG) {
                     x.printStackTrace();
                 //}
+            }
+            if (snooze > 0){
+                // ensure that even if an exception happens, we still sleep a bit.
+                try {Thread.sleep(snooze);} catch (Throwable z){;}
             }
         }
         _rcv = null; // kill our partner

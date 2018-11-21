@@ -181,14 +181,16 @@ public class RTCIceTransport {
     }
 
     public RTCIceCandidatePair nextCheck() {
-        List<RTCIceCandidatePair> scp = candidatePairs;
-        Optional<RTCIceCandidatePair> ret = scp.stream()
-                .sorted(ordering)
-                .limit(MAXCHECKS)
-                .filter((RTCIceCandidatePair icp) -> {
-                    return icp.getState() == RTCIceCandidatePairState.WAITING;
-                })
-                .findFirst();
+        Optional<RTCIceCandidatePair> ret = null;
+        synchronized (candidatePairs) {
+            ret = candidatePairs.stream()
+                    .sorted(ordering)
+                    .limit(MAXCHECKS)
+                    .filter((RTCIceCandidatePair icp) -> {
+                        return icp.getState() == RTCIceCandidatePairState.WAITING;
+                    })
+                    .findFirst();
+        }
         return ret.isPresent() ? ret.get() : null;
     }
 
@@ -209,13 +211,13 @@ public class RTCIceTransport {
             // check for required attributes.
 
             final StunBindingRequest sbr = (StunBindingRequest) p;
-            
+
             if (sbr.hasRequiredIceAttributes()) {
                 ret = new ArrayList();
                 if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
                     RTCIceCandidatePair inbound = findMatchingPair(sbr, prot, ipv);
-                    if ((this.selectedPair != null ) && (inbound != selectedPair)){
-                        Log.verb("We have a selected pair - ignoring this..."+sbr);
+                    if ((this.selectedPair != null) && (inbound != selectedPair)) {
+                        Log.verb("We have a selected pair - ignoring this..." + sbr);
                         return (ret);
                     }
                     if (inbound == null) {
@@ -266,9 +268,9 @@ public class RTCIceTransport {
                         final RTCIceCandidatePair mypair = inbound;
                         mypair.setState(RTCIceCandidatePairState.INPROGRESS);
                         triggeredTrans.oncomplete = (RTCEventData e) -> {
-                            Log.verb("triggered Rtans check complete. do something here "+triggeredTrans);
+                            Log.verb("triggered Rtans check complete. do something here " + triggeredTrans);
                             //to do: some state update on the pair here.
-                            
+
                             mypair.updateState(e);
                         };
                         triggeredTrans.onerror = (RTCEventData e) -> {
@@ -292,10 +294,12 @@ public class RTCIceTransport {
         long pri = p.getPriority();
         RTCIceCandidate t_near = RTCIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri);
         RTCIceCandidate t_far = RTCIceCandidate.mkTempCandidate(p.getFar(), prot, ipv, pri);
-        List<RTCIceCandidatePair> scp = this.candidatePairs;
-        Optional<RTCIceCandidatePair> cp = scp.stream().filter((RTCIceCandidatePair icp) -> {
-            return icp.sameEnough(t_near, t_far);
-        }).findAny();
+        Optional<RTCIceCandidatePair> cp = null;
+        synchronized (candidatePairs) {
+            cp = candidatePairs.stream().filter((RTCIceCandidatePair icp) -> {
+                return icp.sameEnough(t_near, t_far);
+            }).findAny();
+        }
         return cp.isPresent() ? cp.get() : null;
     }
 
@@ -334,10 +338,12 @@ public class RTCIceTransport {
     }
 
     public RTCIceCandidatePair findValidNominatedPair() {
-        List<RTCIceCandidatePair> scp = this.candidatePairs;
-        Optional<RTCIceCandidatePair> npair = scp.stream().filter((RTCIceCandidatePair r) -> {
-            return r.isNominated() && r.getState() == RTCIceCandidatePairState.SUCCEEDED;
-        }).findAny(); // strictly we should order this by priority and _find first_
+        Optional<RTCIceCandidatePair> npair = null;
+        synchronized (candidatePairs) {
+            npair = candidatePairs.stream().filter((RTCIceCandidatePair r) -> {
+                return r.isNominated() && r.getState() == RTCIceCandidatePairState.SUCCEEDED;
+            }).findAny(); // strictly we should order this by priority and _find first_
+        }
         RTCIceCandidatePair ret = npair.isPresent() ? npair.get() : null;
         //Log.verb("selected pair          "+ret);
         //Log.verb("old selected pair was  "+selectedPair);
@@ -348,12 +354,13 @@ public class RTCIceTransport {
             if (selectedPair == null) {
                 this.pruneExcept(ret);
                 this.setState(RTCIceTransportState.CONNECTED);
+                dtlsTo = new InetSocketAddress(ret.getRemote().getIp(), ret.getRemote().getPort());
             }
             if (ret == null) {
                 this.setState(RTCIceTransportState.DISCONNECTED);
+                dtlsTo = null;
             }
             selectedPair = ret;
-            dtlsTo = new InetSocketAddress(selectedPair.getRemote().getIp(), selectedPair.getRemote().getPort());
             if (null != this.oncandidatepairchange) {
                 oncandidatepairchange.onEvent(selectedPair);
             }
@@ -369,8 +376,12 @@ public class RTCIceTransport {
         Log.verb("Will send dtls packet to " + dtlsTo);
         IceEngine ice = this.iceGatherer.getIceEngine();
 
-        ice.sendTo(buf, off, len, dtlsTo);
-        // use selectedPair  to send packet.
+        if (dtlsTo != null) {
+            ice.sendTo(buf, off, len, dtlsTo);
+        } else {
+            Log.debug("Null selected pair, can't send DTLS");
+        }
+        // in effect use selectedPair  to send packet.
     }
 
     public void onError(RTCEventData e) {
@@ -399,6 +410,7 @@ public class RTCIceTransport {
     public void pruneExcept(RTCIceCandidatePair sp) {
         if (sp != null) {
             transMan.pruneExcept(sp);
+            /* instead of pruning the candidate pair list - we just make a new one with one entry :-) */
             ArrayList<RTCIceCandidatePair> nsp = new ArrayList<RTCIceCandidatePair>();
             nsp.add(sp);
             candidatePairs = nsp;
