@@ -296,6 +296,7 @@ For incoming connectivity checks that pass validation,
             int pno = portMin + rand.nextInt(rangeSz);
             try {
                 ret = new DatagramSocket(pno);
+                ret.setTrafficClass(0x10);
                 break;
             } catch (SocketException ex) {
                 Log.debug("retry with new port no " + pno + " is in use");
