@@ -140,9 +140,16 @@ For incoming connectivity checks that pass validation,
                     localAdd.append(" " + ni.getDisplayName() + " ");
                     if (home6 != null) {
                         localAdd.append(" [" + home6.getHostAddress() + "]");
-                        String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
+                        String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home6, null, RTCIceProtocol.UDP);
                         long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
                         lpref -= 6;
+                        String sixad = home6.getHostAddress();
+                        Log.debug("os sixad is "+sixad);
+                        if (sixad.contains("%")){
+                            String bits[] = sixad.split("%");
+                            sixad=bits[0];
+                            Log.debug("new sixad is "+sixad);
+                        }
                         RTCIceCandidate cand6 = new RTCIceCandidate(foundation,
                                 priority,
                                 home6.getHostAddress(),
