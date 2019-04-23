@@ -19,6 +19,7 @@ import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransaction;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -216,7 +217,7 @@ public class RTCIceTransport {
                 ret = new ArrayList();
                 if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
                     RTCIceCandidatePair inbound = findMatchingPair(sbr, prot, ipv);
-                    if ((this.selectedPair != null) && (inbound != selectedPair)) {
+                    if ((selectedPair != null) && (inbound != selectedPair)) {
                         Log.verb("We have a selected pair - ignoring this..." + sbr);
                         return (ret);
                     }
@@ -347,11 +348,12 @@ public class RTCIceTransport {
         RTCIceCandidatePair ret = npair.isPresent() ? npair.get() : null;
         //Log.verb("selected pair          "+ret);
         //Log.verb("old selected pair was  "+selectedPair);
-        if (ret != selectedPair) {
+        RTCIceCandidatePair tSel = selectedPair;
+        if (ret != tSel) {
             Log.debug("have new selected pair " + ret);
-            Log.debug("old selected pair was  " + selectedPair);
+            Log.debug("old selected pair was  " + tSel);
 
-            if (selectedPair == null) {
+            if (tSel == null) {
                 this.pruneExcept(ret);
                 this.setState(RTCIceTransportState.CONNECTED);
                 dtlsTo = new InetSocketAddress(ret.getRemote().getIp(), ret.getRemote().getPort());
@@ -359,10 +361,11 @@ public class RTCIceTransport {
             if (ret == null) {
                 this.setState(RTCIceTransportState.DISCONNECTED);
                 dtlsTo = null;
-            }
-            selectedPair = ret;
-            if (null != this.oncandidatepairchange) {
-                oncandidatepairchange.onEvent(selectedPair);
+            } else {
+                if (null != this.oncandidatepairchange) {
+                    oncandidatepairchange.onEvent(ret);
+                }
+                selectedPair = ret;
             }
         }
         return ret;
@@ -372,14 +375,14 @@ public class RTCIceTransport {
         return this.state;
     }
 
-    public void sendDtlsPkt(byte[] buf, int off, int len) {
+    public void sendDtlsPkt(byte[] buf, int off, int len) throws IOException {
         Log.verb("Will send dtls packet to " + dtlsTo);
         IceEngine ice = this.iceGatherer.getIceEngine();
 
         if (dtlsTo != null) {
             ice.sendTo(buf, off, len, dtlsTo);
         } else {
-            Log.debug("Null selected pair, can't send DTLS");
+            throw new IOException("Null selected pair, can't send DTLS");
         }
         // in effect use selectedPair  to send packet.
     }

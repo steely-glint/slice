@@ -152,7 +152,7 @@ For incoming connectivity checks that pass validation,
                         }
                         RTCIceCandidate cand6 = new RTCIceCandidate(foundation,
                                 priority,
-                                home6.getHostAddress(),
+                                sixad,
                                 RTCIceProtocol.UDP,
                                 (char) _sock.getLocalPort(),
                                 RTCIceCandidateType.HOST,

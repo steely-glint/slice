@@ -24,7 +24,7 @@ import javax.crypto.spec.SecretKeySpec;
  */
 public class StunPacket {
 
-    public static int MTU = 1400;
+    public static int MTU = 1409;
     static int MILENGTH = 24;
     static int FPLEN = 8;
     static long STUNCOOKIE = 0x2112A442;

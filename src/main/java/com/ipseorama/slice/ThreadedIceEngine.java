@@ -10,6 +10,7 @@ import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
@@ -19,6 +20,8 @@ import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -82,17 +85,18 @@ public class ThreadedIceEngine implements IceEngine {
         _started = true;
 
     }
-    @Override 
-    public long nextAvailableTime(){
+
+    @Override
+    public long nextAvailableTime() {
         long now = System.currentTimeMillis();
-        if( nextAvailableTime < now){
+        if (nextAvailableTime < now) {
             nextAvailableTime = now;
         }
         long ret = nextAvailableTime;
         nextAvailableTime += Ta;
         return ret;
     }
-    
+
     @Override
     public void addIceCreds(String user, String pass) {
         miPass.put(user, pass);
@@ -169,7 +173,7 @@ public class ThreadedIceEngine implements IceEngine {
                                 Log.debug("dumping DTLS packet - no selected pair - yet...");
                             }
                         } else if (b < 0) {
-                            if (selected !=null){
+                            if (selected != null) {
                                 selected.pushRTP(dgp);
                             } else {
                                 // strictly this is wrong - we should stack them...
@@ -188,17 +192,21 @@ public class ThreadedIceEngine implements IceEngine {
                             Log.debug("assuming consent revoked");
                             _rcv = null;
                         }
-                    }
+                    } 
                 } catch (Exception x) {
                     if (_sock.isClosed()) {
                         _rcv = null;
+                        Log.debug("Ice Socket closed quitting rcv loop");
                     }
-                    Log.debug("Exception in rcv loop");
-                    if (Log.getLevel() >= Log.DEBUG) {
+                    Log.debug("Exception in ICE rcv loop");
+
+                    if (Log.getLevel() > Log.DEBUG) {
+                        Log.debug("Exception in ICE rcv loop");
                         x.printStackTrace(System.out);
                     }
                 }
             }
+            Log.debug("quit ICE rcv loop");
             _send = null; // kill our partner
             _trans.getTransport().disconnected(selected);
         } catch (SocketException ex) {
@@ -237,18 +245,21 @@ public class ThreadedIceEngine implements IceEngine {
                     snooze = (int) (next - now);
                     if (snooze > Ta) {
                         _trans.wait(snooze);
-                        snooze =0;
+                        snooze = 0;
                     }
                 }
             } catch (Exception x) {
                 Log.error("Exception in loop" + x.getMessage());
                 //if (Log.getLevel() >= Log.DEBUG) {
-                    x.printStackTrace();
+                x.printStackTrace();
                 //}
             }
-            if (snooze > 0){
+            if (snooze > 0) {
                 // ensure that even if an exception happens, we still sleep a bit.
-                try {Thread.sleep(snooze);} catch (Throwable z){;}
+                try {
+                    Thread.sleep(snooze);
+                } catch (Throwable z) {;
+                }
             }
         }
         _rcv = null; // kill our partner
@@ -265,16 +276,12 @@ public class ThreadedIceEngine implements IceEngine {
     }
 
     @Override
-    public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) {
+    public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) throws IOException {
         DatagramPacket p = new DatagramPacket(buf, off, len, dtlsTo);
-        try {
-            _sock.send(p);
-        } catch (Exception x) {
-            Log.error("Exception in sendTo" + x.getMessage());
-            if (Log.getLevel() >= Log.DEBUG) {
-                x.printStackTrace();
-            }
+        if (_sock == null) {
+            throw new IOException("null socket for ICE");
         }
+        _sock.send(p);
     }
 
     public void stop() {

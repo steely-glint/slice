@@ -6,6 +6,7 @@
 package com.ipseorama.slice;
 
 import com.ipseorama.slice.stun.StunTransactionManager;
+import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 
@@ -23,7 +24,7 @@ public interface IceEngine {
 
     public StunTransactionManager getTransactionManager();
 
-    public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo);
+    public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) throws IOException ;
 
     public int getMTU();
     
