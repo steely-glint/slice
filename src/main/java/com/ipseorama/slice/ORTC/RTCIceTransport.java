@@ -401,7 +401,7 @@ public class RTCIceTransport {
     }
 
     public void disconnected(RTCIceCandidatePair selected) {
-        Log.debug("IceTransport disconnected ...because no packets received on " + selected);
+        Log.debug("IceTransport disconnected ...because no packets received on " + selected==null?"":selected.toString());
         this.setState(RTCIceTransportState.DISCONNECTED);
     }
 

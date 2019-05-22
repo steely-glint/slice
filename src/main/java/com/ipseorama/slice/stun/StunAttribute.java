@@ -128,7 +128,7 @@ public class StunAttribute {
 
     static void addSoftware(ArrayList<StunAttribute> attrs) {
         StunAttribute s = new StunAttribute("SOFTWARE");
-        s.setString("pe.pi.slice.ORTC");
+        s.setString("|pipe| webRTC agent for IoT https://pi.pe");
         attrs.add(s);
     }
 
