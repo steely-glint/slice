@@ -198,7 +198,6 @@ public class ThreadedIceEngine implements IceEngine {
                         _rcv = null;
                         Log.debug("Ice Socket closed quitting rcv loop");
                     }
-                    Log.warn("Exception in ICE rcv loop");
 
                     if (Log.getLevel() >= Log.DEBUG) {
                         Log.warn("Exception in ICE rcv loop");
