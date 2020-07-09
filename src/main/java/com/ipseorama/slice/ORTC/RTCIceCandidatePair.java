@@ -82,7 +82,7 @@ public class RTCIceCandidatePair implements RTCEventData {
     }
 
     boolean sameEnough(RTCIceCandidate t_near, RTCIceCandidate t_far) {
-        return getLocal().sameEnough(t_near) && getRemote().sameEnough(t_far);
+        return getLocal().sameEnoughIncludingWildCard(t_near) && getRemote().sameEnough(t_far);
     }
 
     StunTransaction trigger(RTCIceTransport trans) {

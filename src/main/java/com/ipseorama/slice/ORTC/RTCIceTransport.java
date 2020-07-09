@@ -106,7 +106,9 @@ public class RTCIceTransport {
     public void addRemoteCandidate(RTCIceGatherCandidate remoteCandidate) {
         if (remoteCandidate instanceof RTCIceCandidate) {
             RTCIceCandidate r = (RTCIceCandidate) remoteCandidate;
-            this.remoteCandidates.add(r);
+            synchronized (remoteCandidate) {
+                this.remoteCandidates.add(r);
+            }
             List<RTCIceCandidate> locals = new ArrayList(iceGatherer.getLocalCandidates());
             for (RTCIceCandidate l : locals) {
                 addPair(l, r);
@@ -308,9 +310,12 @@ public class RTCIceTransport {
         long pri = p.getPriority();
         RTCIceCandidate t_near = RTCIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri);
         RTCIceCandidate t_far = RTCIceCandidate.mkTempCandidate(p.getFar(), prot, ipv, pri);
-        Optional<RTCIceCandidate> fopt = this.remoteCandidates.stream().filter((RTCIceCandidate r) -> {
-            return r.sameEnough(t_far);
-        }).findAny();
+        Optional<RTCIceCandidate> fopt;
+        synchronized (remoteCandidates) {
+            fopt = this.remoteCandidates.stream().filter((RTCIceCandidate r) -> {
+                return r.sameEnough(t_far);
+            }).findAny();
+        }
         RTCIceCandidate far = fopt.orElse(t_far);
         Optional<RTCIceCandidate> nopt = this.getLocalCandidates().stream().filter((RTCIceCandidate r) -> {
             return r.sameEnough(t_near);
@@ -354,7 +359,8 @@ public class RTCIceTransport {
             Log.debug("old selected pair was  " + tSel);
 
             if (tSel == null) {
-                this.pruneExcept(ret);
+                //this.pruneExcept(ret);
+                Log.warn("Not pruning pairs to see what happens....");
                 this.setState(RTCIceTransportState.CONNECTED);
                 dtlsTo = new InetSocketAddress(ret.getRemote().getIp(), ret.getRemote().getPort());
             }
@@ -401,7 +407,7 @@ public class RTCIceTransport {
     }
 
     public void disconnected(RTCIceCandidatePair selected) {
-        Log.debug("IceTransport disconnected ...because no packets received on " + selected==null?"":selected.toString());
+        Log.debug("IceTransport disconnected ...because no packets received on " + selected == null ? "" : selected.toString());
         this.setState(RTCIceTransportState.DISCONNECTED);
     }
 

@@ -214,11 +214,21 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     public String toString() {
         return this.toSDP(RTCIceComponent.RTP);
     }
-
+    boolean sameEnoughIncludingWildCard(RTCIceCandidate cand) {
+        boolean ret = false;
+        if (isWildCardIp() || cand.isWildCardIp()) {
+            ret = (this.getPort() == cand.getPort() && this.getProtocol().equals(cand.getProtocol()));
+        }  else {
+            ret = sameEnough(cand);
+        }
+        return ret;
+    }
     boolean sameEnough(RTCIceCandidate cand) {
         boolean ret = this.getIp().equals(cand.getIp()) && this.getPort() == cand.getPort() && this.getProtocol().equals(cand.getProtocol());
         if (ret) {
             Log.verb("candidates are similar " + this + " vs " + cand);
+        } else {
+            Log.verb("candidates are different " + this + " vs " + cand);
         }
         return ret;
     }
@@ -314,4 +324,18 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     void setMTU(int m) {
         mtu = m;
     }
+
+    private boolean isWildCardIp() {
+        boolean ret = false;
+        if (ipVersion == 4){
+            ret = ip.equalsIgnoreCase("0.0.0.0");
+        }
+        if (ipVersion == 6){
+            ret = ip.equalsIgnoreCase("::");
+        }
+        Log.verb(" wildcard "+ip+" = "+ret);
+        return ret;
+    }
+
+
 }

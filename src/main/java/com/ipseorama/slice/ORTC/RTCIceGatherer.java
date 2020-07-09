@@ -12,7 +12,6 @@ import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.ipseorama.slice.ORTC.enums.RTCIceGatherPolicy;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
-import com.ipseorama.slice.ORTC.enums.RTCIceTcpCandidateType;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
 import java.net.DatagramSocket;
@@ -29,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -102,83 +100,87 @@ For incoming connectivity checks that pass validation,
                 NetworkInterface ni = (NetworkInterface) nifs.nextElement();
                 byte[] hw = ni.getHardwareAddress();
                 Log.debug("Adding interface: " + ni.getDisplayName());
-                if (ni.isUp()) {
-                    mtu = ni.getMTU();
-                    Enumeration ipads = ni.getInetAddresses();
-                    List<InterfaceAddress> iads = ni.getInterfaceAddresses();
-                    Inet4Address home = null;
-                    Inet6Address home6 = null;
-                    while (ipads.hasMoreElements()) {
-                        InetAddress ipad = (InetAddress) ipads.nextElement();
-                        if (!ipad.isLoopbackAddress()) {
-                            if (ipad instanceof Inet4Address) {
-                                if (home == null) {
-                                    home = (Inet4Address) ipad;
-                                    Log.debug("Using address: " + ipad.getHostAddress());
-                                } else {
-                                    Log.debug("Not Using address: " + ipad.getHostAddress());
-                                }
-                            }
-                            if (ipad instanceof Inet6Address) {
-                                if (ipad.isLinkLocalAddress()) {
-                                    Log.debug("Not Using link local address: " + ipad.getHostAddress());
-                                    continue;
-                                }
-                                if (home6 == null) {
-                                    home6 = (Inet6Address) ipad;
-                                    Log.debug("Using address (for now) : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                } else if (howMacBased(home6.getAddress(), hw) > howMacBased(ipad.getAddress(), hw)) {
-                                    home6 = (Inet6Address) ipad;
-                                    Log.debug("Prefer using address : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                } else {
-                                    Log.debug("Don't prefer Using address: " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                }
-
-                            }
-                        }
-                    }
-                    localAdd.append(" " + ni.getDisplayName() + " ");
-                    if (home6 != null) {
-                        localAdd.append(" [" + home6.getHostAddress() + "]");
-                        String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home6, null, RTCIceProtocol.UDP);
-                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
-                        lpref -= 6;
-                        String sixad = home6.getHostAddress();
-                        Log.debug("os sixad is "+sixad);
-                        if (sixad.contains("%")){
-                            String bits[] = sixad.split("%");
-                            sixad=bits[0];
-                            Log.debug("new sixad is "+sixad);
-                        }
-                        RTCIceCandidate cand6 = new RTCIceCandidate(foundation,
-                                priority,
-                                sixad,
-                                RTCIceProtocol.UDP,
-                                (char) _sock.getLocalPort(),
-                                RTCIceCandidateType.HOST,
-                                null);
-                        cand6.setMTU(mtu);
-                        addLocalCandidate(cand6);
-                    }
-                    if (home != null) {
-                        localAdd.append(home.getHostAddress());
-                        String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
-                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
-                        lpref -= 4;
-                        RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
-                                priority,
-                                home.getHostAddress(),
-                                RTCIceProtocol.UDP,
-                                (char) _sock.getLocalPort(),
-                                RTCIceCandidateType.HOST,
-                                null);
-                        cand4.setIpVersion(4);
-                        cand4.setMTU(mtu);
-                        addLocalCandidate(cand4);
-                    }
-
+                if (ni.isLoopback()) {
+                    Log.debug("Skipping loopback " + ni.getDisplayName());
                 } else {
-                    Log.debug("Ignoring interface: " + ni.getDisplayName());
+                    if (ni.isUp()) {
+                        mtu = ni.getMTU();
+                        Enumeration ipads = ni.getInetAddresses();
+                        List<InterfaceAddress> iads = ni.getInterfaceAddresses();
+                        Inet4Address home = null;
+                        Inet6Address home6 = null;
+                        while (ipads.hasMoreElements()) {
+                            InetAddress ipad = (InetAddress) ipads.nextElement();
+                            if (!ipad.isLoopbackAddress()) {
+                                if (ipad instanceof Inet4Address) {
+                                    if (home == null) {
+                                        home = (Inet4Address) ipad;
+                                        Log.debug("Using address: " + ipad.getHostAddress());
+                                    } else {
+                                        Log.debug("Not Using address: " + ipad.getHostAddress());
+                                    }
+                                }
+                                if (ipad instanceof Inet6Address) {
+                                    if (ipad.isLinkLocalAddress()) {
+                                        Log.debug("Not Using link local address: " + ipad.getHostAddress());
+                                        continue;
+                                    }
+                                    if (home6 == null) {
+                                        home6 = (Inet6Address) ipad;
+                                        Log.debug("Using address (for now) : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                    } else if (howMacBased(home6.getAddress(), hw) > howMacBased(ipad.getAddress(), hw)) {
+                                        home6 = (Inet6Address) ipad;
+                                        Log.debug("Prefer using address : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                    } else {
+                                        Log.debug("Don't prefer Using address: " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                    }
+
+                                }
+                            }
+                        }
+                        localAdd.append(" " + ni.getDisplayName() + " ");
+                        if (home6 != null) {
+                            localAdd.append(" [" + home6.getHostAddress() + "]");
+                            String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home6, null, RTCIceProtocol.UDP);
+                            long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
+                            lpref -= 6;
+                            String sixad = home6.getHostAddress();
+                            Log.debug("os sixad is " + sixad);
+                            if (sixad.contains("%")) {
+                                String bits[] = sixad.split("%");
+                                sixad = bits[0];
+                                Log.debug("new sixad is " + sixad);
+                            }
+                            RTCIceCandidate cand6 = new RTCIceCandidate(foundation,
+                                    priority,
+                                    sixad,
+                                    RTCIceProtocol.UDP,
+                                    (char) _sock.getLocalPort(),
+                                    RTCIceCandidateType.HOST,
+                                    null);
+                            cand6.setMTU(mtu);
+                            addLocalCandidate(cand6);
+                        }
+                        if (home != null) {
+                            localAdd.append(home.getHostAddress());
+                            String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
+                            long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
+                            lpref -= 4;
+                            RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
+                                    priority,
+                                    home.getHostAddress(),
+                                    RTCIceProtocol.UDP,
+                                    (char) _sock.getLocalPort(),
+                                    RTCIceCandidateType.HOST,
+                                    null);
+                            cand4.setIpVersion(4);
+                            cand4.setMTU(mtu);
+                            addLocalCandidate(cand4);
+                        }
+
+                    } else {
+                        Log.debug("Ignoring interface: " + ni.getDisplayName());
+                    }
                 }
             }
         } catch (SocketException x) {

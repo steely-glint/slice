@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.ipseorama</groupId>
     <artifactId>slice</artifactId>
-    <version>1.0.91</version>
+    <version>1.0.92-NICE</version>
     <packaging>jar</packaging>
     <dependencies>
         <dependency>
