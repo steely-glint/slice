@@ -11,10 +11,16 @@ import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.ipseorama.slice.ORTC.enums.RTCIceCredentialType;
 import com.ipseorama.slice.ORTC.enums.RTCIceGatherPolicy;
 import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
+import com.ipseorama.slice.SingleThreadNioIceEngine;
 import com.ipseorama.slice.ThreadedIceEngine;
+import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
+import java.io.IOException;
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.channels.Selector;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
@@ -28,7 +34,48 @@ import org.junit.Test;
  * @author thp
  */
 public class RTCIceGathererTest {
+    class DummyIceEngine implements IceEngine {
 
+    public DummyIceEngine() {
+    }
+
+        @Override
+        public void start(Selector ds, StunTransactionManager tm) {
+        }
+
+        @Override
+        public void start(DatagramSocket ds, StunTransactionManager tm) {
+        }
+
+        @Override
+        public boolean isStarted() {
+            return true;
+        }
+
+        @Override
+        public void addIceCreds(String user, String pass) {
+        }
+
+        @Override
+        public StunTransactionManager getTransactionManager() {
+            return null;
+        }
+
+        @Override
+        public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) throws IOException {
+        }
+
+        @Override
+        public int getMTU() {
+            return 1500;
+        }
+
+        @Override
+        public long nextAvailableTime() {
+            return System.currentTimeMillis();
+        }
+    
+}
     public RTCIceGathererTest() {
         Log.setLevel(Log.ALL);
     }
@@ -87,11 +134,14 @@ public class RTCIceGathererTest {
                 ;
             }
         }
-        List<RTCIceCandidate> lc = instance.getLocalCandidates();
+        List<RTCLocalIceCandidate> lc = instance.getLocalCandidates();
+        lc.forEach((_item) -> {
+            Log.info(_item.toSDP(RTCIceComponent.RTP));
+        });
         assert (lc.size() > 0);
     }
 
-    @Test
+    //@Test
     public void testGatherReflex() throws URISyntaxException {
 
         //        "iceServers": [
@@ -126,7 +176,7 @@ public class RTCIceGathererTest {
                 }
             }
         };
-        IceEngine tie = new ThreadedIceEngine();
+        IceEngine tie = new SingleThreadNioIceEngine();
         instance.setIceEngine(tie);
         instance.gather(options);
         // TODO review the generated test code and remove the default call to fail.
@@ -137,7 +187,7 @@ public class RTCIceGathererTest {
                 ;
             }
         }
-        List<RTCIceCandidate> cands = instance.getLocalCandidates();
+        List<RTCLocalIceCandidate> cands = instance.getLocalCandidates();
         boolean m = cands.stream().anyMatch((RTCIceCandidate c) -> {
             return c.getType() == RTCIceCandidateType.SRFLX;
         });
@@ -208,7 +258,7 @@ public class RTCIceGathererTest {
         options.setGatherPolicy(RTCIceGatherPolicy.ALL);
         ArrayList<RTCIceServer> iceServers = new ArrayList<RTCIceServer>();
         options.setIceServers(iceServers);
-        IceEngine tie = new ThreadedIceEngine();
+        IceEngine tie = new SingleThreadNioIceEngine();
         instance.setIceEngine(tie);
         instance.gather(options);
         synchronized (instance) {

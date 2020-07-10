@@ -10,6 +10,7 @@ import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.phono.srtplight.Log;
 import java.net.InetSocketAddress;
+import java.nio.channels.DatagramChannel;
 
 /**
  *
@@ -50,7 +51,13 @@ public class StunErrorTransaction extends StunTransaction implements RTCEventDat
         rbind.setFar(_far);
         rbind.setRequiredAttributes(87,"Role conflict");
         complete = true;
+        rbind.setChannel(inbound.getChannel());
         return rbind;
+    }
+
+    @Override
+    public DatagramChannel getChannel() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
 

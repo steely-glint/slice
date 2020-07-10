@@ -8,6 +8,7 @@ package com.ipseorama.slice.stun;
 import com.phono.srtplight.Log;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -73,6 +74,7 @@ public class StunPacket {
     byte[] _pass;
     private InetSocketAddress _far;
     private InetSocketAddress _near;
+    private DatagramChannel _channel;
 
     public byte[] outboundBytes(Map<String, String> miPass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
         byte[] pass = StunPacket.findPass(_attributes, miPass, null);
@@ -222,7 +224,7 @@ public class StunPacket {
                 if ((realm != null) && (pass != null)) {
                     pass = susers[z] + ":" + realm + ":" + pass; // should do SASLPrep
                 }
-                Log.debug("User =" + username + " pass =" + pass + " based on " + susers[z]);
+                Log.verb("User =" + username + " pass =" + pass + " based on " + susers[z]);
                 if (pass == null) {
                     Log.verb("miPass contained:");
                     miPass.forEach((String u, String p) -> {
@@ -444,6 +446,13 @@ public class StunPacket {
      */
     public void setNear(InetSocketAddress _near) {
         this._near = _near;
+    }
+
+    public void setChannel(DatagramChannel dgc) {
+        this._channel = dgc;
+    }
+    public DatagramChannel getChannel(){
+        return this._channel;
     }
 
     static class FingerPrintException extends Exception {

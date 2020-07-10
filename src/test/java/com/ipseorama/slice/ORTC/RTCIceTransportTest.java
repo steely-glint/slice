@@ -33,14 +33,14 @@ import static org.junit.Assert.*;
  */
 public class RTCIceTransportTest {
 
-    private static RTCIceCandidate mkCandy(JsonObject jo) {
-        RTCIceCandidate ret = new RTCIceCandidate(jo.getString("foundation"),
+    private static RTCLocalIceCandidate mkCandy(JsonObject jo) {
+        RTCLocalIceCandidate ret = new RTCLocalIceCandidate(jo.getString("foundation"),
                 Long.parseLong(jo.getString("priority", "0")),
                 jo.getString("ip"),
                 RTCIceProtocol.fromString(jo.getString("protocol", "tcp")),
                 (char) Integer.parseInt(jo.getString("port", "0")),
                 RTCIceCandidateType.fromString(jo.getString("type", "host")),
-                null);
+                null,null);
         if (jo.getString("ip").contains(".")) {
             ret.setIpVersion(4);
         }
@@ -51,7 +51,7 @@ public class RTCIceTransportTest {
         return ret;
     }
 
-    private static RTCIceCandidate[] mkLocals() {
+    private static RTCLocalIceCandidate[] mkLocals() {
         return parseJsonCandy(localsJson);
     }
 
@@ -59,11 +59,11 @@ public class RTCIceTransportTest {
         return parseJsonCandy(remotesJson);
     }
 
-    private static RTCIceCandidate[] parseJsonCandy(String json) {
+    private static RTCLocalIceCandidate[] parseJsonCandy(String json) {
         StringReader s = new StringReader(json);
         JsonReader reader = Json.createReader(s);
         JsonArray lcs = (JsonArray) reader.read();
-        RTCIceCandidate[] ret = new RTCIceCandidate[lcs.size()];
+        RTCLocalIceCandidate[] ret = new RTCLocalIceCandidate[lcs.size()];
         for (int o = 0; o < ret.length; o++) {
             JsonObject jo = lcs.getJsonObject(o);
             ret[o] = mkCandy(jo);
@@ -80,7 +80,7 @@ public class RTCIceTransportTest {
             + "{\"foundation\":\"3486758882\",\"component\":\"1\",\"protocol\":\"udp\",\"priority\":\"2122194687\",\"ip\":\"192.67.4.33\",\"port\":\"59240\",\"type\":\"host\",\"generation\":\"0\"},"
             + "{\"foundation\":\"2190409698\",\"component\":\"1\",\"protocol\":\"udp\",\"priority\":\"2122262783\",\"ip\":\"2a01:348:339::4d4e:d55b:3814:9bbb\",\"port\":\"58585\",\"type\":\"host\",\"generation\":\"0\"}"
             + "]";
-    RTCIceCandidate locals[];
+    RTCLocalIceCandidate locals[];
 
     static String remotesJson = "["
             + "{\"foundation\":\"3\",\"component\":\"1\",\"protocol\":\"udp\",\"priority\":\"16777215\",\"ip\":\"146.148.121.175\",\"port\":\"58930\",\"type\":\"relay\",\"generation\":\"0\",\"raddr\":\"192.67.4.167\",\"rport\":\"11931\"},"
@@ -269,7 +269,7 @@ public class RTCIceTransportTest {
             @Override
             public void gather(RTCIceGatherOptions options) {
                 setState(RTCIceGathererState.GATHERING);
-                for (RTCIceCandidate l : locals) {
+                for (RTCLocalIceCandidate l : locals) {
                     addLocalCandidate(l);
                 }
             }

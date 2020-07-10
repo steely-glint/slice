@@ -17,6 +17,7 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.channels.Selector;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -295,5 +296,10 @@ public class SingleThreadIceEngine implements IceEngine {
 
     public int getMTU() {
         return mtu;
+    }
+
+    @Override
+    public void start(Selector ds, StunTransactionManager tm) {
+        throw new UnsupportedOperationException("Selector Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }

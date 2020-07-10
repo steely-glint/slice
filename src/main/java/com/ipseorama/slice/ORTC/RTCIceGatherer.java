@@ -1,8 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package com.ipseorama.slice.ORTC;
 
 import com.ipseorama.slice.stun.StunBindingTransaction;
@@ -14,6 +10,7 @@ import com.ipseorama.slice.ORTC.enums.RTCIceGatherPolicy;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
+import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -23,6 +20,9 @@ import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URI;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -53,17 +53,24 @@ For incoming connectivity checks that pass validation,
     to associated RTCIceTransport objects so that they can respond.
      */
     private RTCIceComponent _component;
-    DatagramSocket _sock; // should this be a property of the component ?
-    ArrayList<RTCIceCandidate> _localCandidates;
+    // DatagramSocket _sock; // should this be a property of the component ?
+    Selector _selector;
+    ArrayList<RTCLocalIceCandidate> _localCandidates;
     IceEngine _ice;
     private final StunTransactionManager _stm;
     private RTCIceParameters _localParams;
+    private RTCIceGatherOptions _options;
 
     public RTCIceGatherer() {
         _localCandidates = new ArrayList();
         _component = RTCIceComponent.RTP;
         _state = RTCIceGathererState.NEW;
         _stm = new StunTransactionManager();
+        try {
+            _selector = Selector.open();
+        } catch (IOException x) {
+            Log.error("Can't make ice selector! " + x.getMessage());
+        }
     }
 
     RTCIceComponent getIceComponent() {
@@ -76,8 +83,12 @@ For incoming connectivity checks that pass validation,
     }
 
     public void close() {
-        if ((_sock != null) && (!_sock.isClosed())) {
-            _sock.close();
+        if ((_selector != null) && (_selector.isOpen())) {
+            try {
+                _selector.close();
+            } catch (IOException x) {
+                Log.error("Can't close ice selector! " + x.getMessage());
+            }
         }
     }
 
@@ -138,8 +149,9 @@ For incoming connectivity checks that pass validation,
                                 }
                             }
                         }
-                        localAdd.append(" " + ni.getDisplayName() + " ");
+                        localAdd.append("\t\t" + ni.getDisplayName() + " ");
                         if (home6 != null) {
+
                             localAdd.append(" [" + home6.getHostAddress() + "]");
                             String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home6, null, RTCIceProtocol.UDP);
                             long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
@@ -151,31 +163,52 @@ For incoming connectivity checks that pass validation,
                                 sixad = bits[0];
                                 Log.debug("new sixad is " + sixad);
                             }
-                            RTCIceCandidate cand6 = new RTCIceCandidate(foundation,
-                                    priority,
-                                    sixad,
-                                    RTCIceProtocol.UDP,
-                                    (char) _sock.getLocalPort(),
-                                    RTCIceCandidateType.HOST,
-                                    null);
-                            cand6.setMTU(mtu);
-                            addLocalCandidate(cand6);
+                            try {
+                                DatagramChannel channel = createDatagramChannel(sixad);
+                                int port = channel.socket().getLocalPort();
+                                RTCLocalIceCandidate cand6 = new RTCLocalIceCandidate(foundation,
+                                        priority,
+                                        sixad,
+                                        RTCIceProtocol.UDP,
+                                        (char) port,
+                                        RTCIceCandidateType.HOST,
+                                        null,channel);
+                                cand6.setMTU(mtu);
+
+                                addLocalCandidate(cand6);
+
+                                channel.register(_selector, SelectionKey.OP_READ, (Object) cand6);
+                            } catch (IOException x) {
+                                Log.error("Candidate creation failed for " + home6);
+                            }
+
                         }
                         if (home != null) {
-                            localAdd.append(home.getHostAddress());
-                            String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
-                            long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
-                            lpref -= 4;
-                            RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
-                                    priority,
-                                    home.getHostAddress(),
-                                    RTCIceProtocol.UDP,
-                                    (char) _sock.getLocalPort(),
-                                    RTCIceCandidateType.HOST,
-                                    null);
-                            cand4.setIpVersion(4);
-                            cand4.setMTU(mtu);
-                            addLocalCandidate(cand4);
+                            String fourad = home.getHostAddress();
+                            try {
+                                DatagramChannel channel = createDatagramChannel(fourad);
+                                localAdd.append(fourad).append('\n');
+                                String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
+                                long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
+                                lpref -= 4;
+                                int port = channel.socket().getLocalPort();
+
+                                RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
+                                        priority,
+                                        fourad,
+                                        RTCIceProtocol.UDP,
+                                        (char) port,
+                                        RTCIceCandidateType.HOST,
+                                        null,
+                                        channel);
+                                cand4.setIpVersion(4);
+                                cand4.setMTU(mtu);
+
+                                addLocalCandidate(cand4);
+                                channel.register(_selector, SelectionKey.OP_READ, (Object) cand4);
+                            } catch (IOException x) {
+                                Log.error("Candidate creation failed for " + fourad);
+                            }
                         }
 
                     } else {
@@ -184,16 +217,20 @@ For incoming connectivity checks that pass validation,
                 }
             }
         } catch (SocketException x) {
+            Log.warn("socket problem  " + x);
+            if (Log.getLevel() > Log.DEBUG) {
+                x.printStackTrace();
+            }
         }
-
+        Log.debug("Local addresses: " + localAdd);
         for (RTCIceCandidate c : _localCandidates) {
             Log.debug(c.toSDP(_component));
         }
 
     }
 
-    void addLocalCandidate(RTCIceCandidate cand) {
-        if (!_localCandidates.stream().anyMatch((RTCIceCandidate ec) -> {
+    void addLocalCandidate(RTCLocalIceCandidate cand) {
+        if (!_localCandidates.stream().anyMatch((RTCLocalIceCandidate ec) -> {
             return ec.sameEnough(cand);
         })) {
             _localCandidates.add(cand);
@@ -212,11 +249,12 @@ For incoming connectivity checks that pass validation,
         as candidates are generated, we fire events and add to the list.
          */
         setState(RTCIceGathererState.GATHERING);
-        _sock = allocateUdpSocket(options.getPortMin(), options.getPortMax());
+        _options = options;
+        //_sock = allocateUdpSocket(options.getPortMin(), options.getPortMax());
         RTCIceGatherPolicy policy = options.getGatherPolicy();
         List<RTCIceServer> servers = options.getIceServers();
         if ((_ice != null) && (!_ice.isStarted())) {
-            _ice.start(_sock, _stm);
+            _ice.start(_selector, _stm);
         }
         switch (policy) {
             case NOHOST:
@@ -242,7 +280,7 @@ For incoming connectivity checks that pass validation,
         _localParams = local;
     }
 
-    List<RTCIceCandidate> getLocalCandidates() {
+    List<RTCLocalIceCandidate> getLocalCandidates() {
         return _localCandidates;
     }
 
@@ -315,7 +353,9 @@ For incoming connectivity checks that pass validation,
     }
 
     private void gatherReflex(List<RTCIceServer> servers) {
-
+        try {
+        DatagramChannel reflexC = createDatagramChannel("0.0.0.0");
+        reflexC.register(_selector, SelectionKey.OP_READ);
         servers.stream().forEach(
                 (RTCIceServer s) -> {
                     Stream<String> stuns = s.urls.stream().map(
@@ -349,6 +389,7 @@ For incoming connectivity checks that pass validation,
                         if (host != null) {
                             StunBindingTransaction sbt = new StunBindingTransaction(_ice, host, port);
                             sbt.setCause("outbound gather");
+                            sbt.setChannel(reflexC);
 
                             sbt.oncomplete = (RTCEventData e) -> {
                                 Log.debug("got binding reply - or timeout");
@@ -363,24 +404,24 @@ For incoming connectivity checks that pass validation,
                                     if (ref != null) {
                                         RTCIceCandidateType type = RTCIceCandidateType.SRFLX;
                                         RTCIceProtocol prot = RTCIceProtocol.UDP;
-                                        InetAddress raddr = _sock.getLocalAddress();
-                                        char rport = (char) _sock.getLocalPort();
+                                        InetAddress raddr = reflexC.socket().getLocalAddress();
+                                        char rport = (char) reflexC.socket().getLocalPort();
 
                                         String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
                                         long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
-                                        RTCIceCandidate cand4 = new RTCIceCandidate(foundation,
+                                        RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
                                                 priority,
                                                 ref.getAddress().getHostAddress(),
                                                 prot,
                                                 (char) ref.getPort(),
                                                 type,
-                                                null);
+                                                null,reflexC);
                                         cand4.setRelatedAddress(raddr.getHostAddress());
                                         cand4.setRelatedPort(rport);
                                         if (ref.getAddress() instanceof java.net.Inet4Address) {
                                             cand4.setIpVersion(4);
                                         }
-                                        Optional<RTCIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {
+                                        Optional<RTCLocalIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {
                                             return l.getIpVersion() == cand4.getIpVersion();
                                         }).findFirst();
                                         lad.ifPresent((RTCIceCandidate l) -> {
@@ -399,6 +440,9 @@ For incoming connectivity checks that pass validation,
                         }
                     });
                 });
+        } catch (IOException x){
+            
+        }
     }
 
     private void gatherRelay(List<RTCIceServer> servers) {
@@ -415,5 +459,31 @@ For incoming connectivity checks that pass validation,
 
     StunTransactionManager getStunTransactionManager() {
         return _stm;
+    }
+
+    private DatagramChannel createDatagramChannel(String home) throws IOException {
+        DatagramChannel ret = DatagramChannel.open();
+
+        int portMin = (_options != null) ? _options.getPortMin() : 9000;
+        int portMax = (_options != null) ? _options.getPortMax() : 10000;
+        SecureRandom rand = new SecureRandom();
+        int rangeSz = portMax - portMin;
+        for (int tries = 0; tries < rangeSz * 2; tries++) {
+            int pno = portMin + rand.nextInt(rangeSz);
+            try {
+                InetSocketAddress local = new InetSocketAddress(home, pno);
+                Log.verb("new local socket address "+local.toString());
+                ret.bind(local);
+                ret.configureBlocking(false);
+                ret.socket().setTrafficClass(46);
+                break;
+            } catch (SocketException ex) {
+                Log.debug("retry with new port no " + pno + " is in use on " + home);
+            }
+        }
+        if (ret == null) {
+            throw new IOException("No free ports");
+        }
+        return ret;
     }
 }

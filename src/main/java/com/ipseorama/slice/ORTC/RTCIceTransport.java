@@ -21,6 +21,7 @@ import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.DatagramChannel;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -74,8 +75,8 @@ public class RTCIceTransport {
         }
         this.role = role;
         gatherer.onlocalcandidate = (RTCEventData c) -> {
-            if (c instanceof RTCIceCandidate) {
-                RTCIceCandidate l = (RTCIceCandidate) c;
+            if (c instanceof RTCLocalIceCandidate) {
+                RTCLocalIceCandidate l = (RTCLocalIceCandidate) c;
                 List<RTCIceCandidate> remotes = new ArrayList(remoteCandidates);
                 for (RTCIceCandidate r : remotes) {
                     addPair(l, r);
@@ -109,8 +110,8 @@ public class RTCIceTransport {
             synchronized (remoteCandidate) {
                 this.remoteCandidates.add(r);
             }
-            List<RTCIceCandidate> locals = new ArrayList(iceGatherer.getLocalCandidates());
-            for (RTCIceCandidate l : locals) {
+            List<RTCLocalIceCandidate> locals = new ArrayList(iceGatherer.getLocalCandidates());
+            for (RTCLocalIceCandidate l : locals) {
                 addPair(l, r);
             }
         } else {
@@ -161,7 +162,7 @@ public class RTCIceTransport {
         }
     }
 
-    private void addPair(RTCIceCandidate l, RTCIceCandidate r) {
+    private void addPair(RTCLocalIceCandidate l, RTCIceCandidate r) {
         if (l.getProtocol() == r.getProtocol() && l.getIpVersion() == r.getIpVersion()) {
             synchronized (candidatePairs) {
                 boolean present = candidatePairs.stream().anyMatch((RTCIceCandidatePair p) -> {
@@ -214,7 +215,7 @@ public class RTCIceTransport {
             // check for required attributes.
 
             final StunBindingRequest sbr = (StunBindingRequest) p;
-
+            
             if (sbr.hasRequiredIceAttributes()) {
                 ret = new ArrayList();
                 if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
@@ -308,7 +309,8 @@ public class RTCIceTransport {
 
     private RTCIceCandidatePair mkPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
         long pri = p.getPriority();
-        RTCIceCandidate t_near = RTCIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri);
+        DatagramChannel ch = p.getChannel();
+        RTCLocalIceCandidate t_near = RTCLocalIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri,ch);
         RTCIceCandidate t_far = RTCIceCandidate.mkTempCandidate(p.getFar(), prot, ipv, pri);
         Optional<RTCIceCandidate> fopt;
         synchronized (remoteCandidates) {
@@ -317,10 +319,10 @@ public class RTCIceTransport {
             }).findAny();
         }
         RTCIceCandidate far = fopt.orElse(t_far);
-        Optional<RTCIceCandidate> nopt = this.getLocalCandidates().stream().filter((RTCIceCandidate r) -> {
+        Optional<RTCLocalIceCandidate> nopt = this.getLocalCandidates().stream().filter((RTCLocalIceCandidate r) -> {
             return r.sameEnough(t_near);
         }).findAny();
-        RTCIceCandidate near = nopt.orElse(t_near);
+        RTCLocalIceCandidate near = nopt.orElse(t_near);
         RTCIceCandidatePair ret = new RTCIceCandidatePair(near, far);
         synchronized (candidatePairs) {
             candidatePairs.add(ret);
@@ -339,7 +341,7 @@ public class RTCIceTransport {
         return tieBreaker;
     }
 
-    private List<RTCIceCandidate> getLocalCandidates() {
+    private List<RTCLocalIceCandidate> getLocalCandidates() {
         return this.iceGatherer.getLocalCandidates();
     }
 

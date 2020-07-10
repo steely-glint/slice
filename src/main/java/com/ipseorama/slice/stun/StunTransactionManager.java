@@ -126,7 +126,7 @@ public class StunTransactionManager {
                 .filter((StunTransaction t) -> {
                     return (t != null) && !t.isComplete() && t.getDueTime() <= now;
                 }).map((StunTransaction t) -> {
-            Log.debug("Building packet for " + t.toString() + "due at " + t.dueTime);
+            Log.verb("Building packet for " + t.toString() + "due at " + t.dueTime);
             return t.buildOutboundPacket();
         }).collect(Collectors.toList());
         return pkts;

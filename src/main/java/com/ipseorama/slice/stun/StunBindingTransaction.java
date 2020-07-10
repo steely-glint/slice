@@ -10,6 +10,7 @@ import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.phono.srtplight.Log;
 import java.net.InetSocketAddress;
+import java.nio.channels.DatagramChannel;
 
 /**
  *
@@ -24,6 +25,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     StunBindingRequest inbound = null;
     StunBindingResponse response;
     IceEngine ice;
+    private DatagramChannel _channel;
 
     public StunBindingTransaction(IceEngine e, String host, int port) {
         super();
@@ -38,6 +40,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
         inbound = sbreq;
         ice = e;
         dueTime = ice.nextAvailableTime();
+        _channel = sbreq.getChannel();
     }
 
     public InetSocketAddress getFar() {
@@ -87,6 +90,14 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
                 oncomplete.onEvent(null);
             }
         }
+        if (_channel == null){
+            throw new NullPointerException("Channel is null "+this.toString());
+        } else {
+            if (bind != null) {
+                bind.setChannel(_channel);
+            }
+        }
+        
         return bind;
     }
 
@@ -99,6 +110,14 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
 
     public StunBindingResponse getResponse() {
         return response;
+    }
+
+    public void setChannel(DatagramChannel chan) {
+        _channel = chan;
+    }
+    
+    public DatagramChannel getChannel(){
+        return _channel;
     }
 
 }

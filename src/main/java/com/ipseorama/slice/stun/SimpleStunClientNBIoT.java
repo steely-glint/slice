@@ -19,6 +19,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.nio.channels.Selector;
 import java.util.Timer;
 
 /**
@@ -47,6 +48,10 @@ public class SimpleStunClientNBIoT extends StunBindingTransaction {
     static IceEngine dummyEngine = new IceEngine(){
         @Override
         public void start(DatagramSocket ds, StunTransactionManager tm) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+        @Override
+        public void start(Selector ds, StunTransactionManager tm) {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 

@@ -22,7 +22,7 @@ import java.net.InetSocketAddress;
  */
 public class RTCIceCandidatePair implements RTCEventData {
 
-    private final RTCIceCandidate local;
+    private final RTCLocalIceCandidate local;
     private final RTCIceCandidate remote;
     private RTCIceCandidatePairState state;
     private boolean nominated;
@@ -31,7 +31,7 @@ public class RTCIceCandidatePair implements RTCEventData {
     public EventHandler onRevoke;
     private boolean triggerHadUseCandidateSet;
 
-    RTCIceCandidatePair(RTCIceCandidate local, RTCIceCandidate remote) {
+    RTCIceCandidatePair(RTCLocalIceCandidate local, RTCIceCandidate remote) {
         this.local = local;
         this.remote = remote;
         this.state = RTCIceCandidatePairState.WAITING;
@@ -40,7 +40,7 @@ public class RTCIceCandidatePair implements RTCEventData {
     /**
      * @return the local
      */
-    public RTCIceCandidate getLocal() {
+    public RTCLocalIceCandidate getLocal() {
         return local;
     }
 
@@ -116,6 +116,7 @@ public class RTCIceCandidatePair implements RTCEventData {
                 outboundUser,mayNominate);
         ret.setCause(cause);
         ret.setPair(this);
+        ret.setChannel(local.getChannel());
         return ret;
     }
 

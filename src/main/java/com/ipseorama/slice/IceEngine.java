@@ -9,6 +9,7 @@ import com.ipseorama.slice.stun.StunTransactionManager;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.nio.channels.Selector;
 
 /**
  *
@@ -16,6 +17,7 @@ import java.net.InetSocketAddress;
  */
 public interface IceEngine {
 
+    public void start(Selector ds, StunTransactionManager tm);
     public void start(DatagramSocket ds, StunTransactionManager tm);
 
     public boolean isStarted();

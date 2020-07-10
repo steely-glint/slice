@@ -10,21 +10,30 @@ import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.phono.srtplight.Log;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.security.SecureRandom;
+import java.util.Set;
 
 /**
  *
  * @author tim
  */
-public class SimpleStunClient extends StunBindingTransaction {
+public class SimpleStunClientNio extends StunBindingTransaction {
 
     public static void main(String[] argv) {
         Log.setLevel(Log.ALL);
-        SimpleStunClient me = new SimpleStunClient("146.148.121.175", 3478);
+        SimpleStunClientNio me = new SimpleStunClientNio("146.148.121.175", 3478);
         try {
             me.query();
         } catch (Exception ex) {
@@ -34,15 +43,17 @@ public class SimpleStunClient extends StunBindingTransaction {
     }
     private boolean unanswered = true;
     private StunTransactionManager stm;
-    static IceEngine dummyEngine = new IceEngine(){
+    static IceEngine dummyEngine = new IceEngine() {
         @Override
         public void start(DatagramSocket ds, StunTransactionManager tm) {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
+
         @Override
         public void start(Selector ds, StunTransactionManager tm) {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
+
         @Override
         public boolean isStarted() {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
@@ -72,12 +83,28 @@ public class SimpleStunClient extends StunBindingTransaction {
         public long nextAvailableTime() {
             return System.currentTimeMillis();
         }
-        
+
     };
-    public SimpleStunClient(String host, int port) {
+    Selector s_sell;
+    Selector r_sell;
+
+    DatagramChannel dgc;
+
+    public SimpleStunClientNio(String host, int port) {
         super(dummyEngine, host, port);
-        stm = new StunTransactionManager();
-        stm.addTransaction(this);
+        try {
+            r_sell = Selector.open();
+            s_sell = Selector.open();
+
+            dgc = createDatagramChannel("192.168.0.100");
+            dgc.register(r_sell, SelectionKey.OP_READ);
+            //dgc.register(s_sell, SelectionKey.OP_WRITE);
+            stm = new StunTransactionManager();
+            stm.addTransaction(this);
+        } catch (Exception x) {
+            Log.debug("problem " + x.getMessage());
+            x.printStackTrace();
+        }
     }
 
     private void query() throws Exception {
@@ -110,18 +137,73 @@ public class SimpleStunClient extends StunBindingTransaction {
 
     }
 
+    private DatagramChannel createDatagramChannel(String home) throws IOException {
+        DatagramChannel ret = DatagramChannel.open();
+
+        int portMin = 9000;
+        int portMax = 10000;
+        SecureRandom rand = new SecureRandom();
+        int rangeSz = portMax - portMin;
+        for (int tries = 0; tries < rangeSz * 2; tries++) {
+            int pno = portMin + rand.nextInt(rangeSz);
+            try {
+                InetSocketAddress local = new InetSocketAddress(home, pno);
+                Log.verb("new local socket address " + local.toString());
+                ret.bind(local);
+                ret.configureBlocking(false);
+                ret.socket().setTrafficClass(46);
+                break;
+            } catch (SocketException ex) {
+                Log.debug("retry with new port no " + pno + " is in use on " + home);
+            }
+        }
+        if (ret == null) {
+            throw new IOException("No free ports");
+        }
+        return ret;
+    }
+
     byte[] sendAndRecv(byte[] send, int nap) throws Exception {
         byte[] rcvd = null;
-        DatagramSocket dgs = new DatagramSocket();
+        ByteBuffer rec = ByteBuffer.allocate(1024);
+        ByteBuffer src = ByteBuffer.wrap(send);
+        boolean sent = false;
+       try {
+/*            int bitm = s_sell.select(nap);
+            if (bitm != 0) {
+                Log.debug("ok to send " + bitm);
+                Set<SelectionKey> keys = s_sell.selectedKeys();
+                for (SelectionKey k : keys) {
+                    if (k.isWritable() && !sent) {
+                        Log.debug("about to send ");
+                        DatagramChannel rdc = (DatagramChannel) k.channel();
+*/
+    
+                        dgc.send(src, this._far);
+                        sent = true;
+/*                    }
+                }
+            }*/
+            Log.debug("starting to listen sent=" + sent);
+            int bitm = r_sell.select(nap);
+            if (bitm != 0) {
+                Log.debug("ok to recv " + bitm);
+                Set<SelectionKey> keys = r_sell.selectedKeys();
+                for (SelectionKey k : keys) {
+                    if (k.isReadable()) {
+                        Log.debug("about to rec ");
+                        DatagramChannel rdc = (DatagramChannel) k.channel();
+                        SocketAddress from = rdc.receive(rec);
+                        Log.debug("rec.from is "+from);
+                        rec.flip();
+                        rcvd = new byte[rec.remaining()];
+                        rec.get(rcvd);
+                        Log.debug("returning "+rcvd.length);
 
-        DatagramPacket spkt = new DatagramPacket(send, send.length, this._far);
-        DatagramPacket rpkt = new DatagramPacket(new byte[1024], 0, 1024);
-        dgs.send(spkt);
-        dgs.setSoTimeout(nap);
-        try {
-            dgs.receive(rpkt);
-            rcvd = new byte[rpkt.getLength()];
-            System.arraycopy(rpkt.getData(), rpkt.getOffset(), rcvd, 0, rpkt.getLength());
+                    }
+
+                }
+            }
         } catch (SocketTimeoutException tx) {
             Log.debug("retry...");
         }
