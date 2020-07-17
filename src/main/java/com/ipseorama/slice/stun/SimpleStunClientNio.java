@@ -11,7 +11,6 @@ import com.ipseorama.slice.ORTC.RTCTimeoutEvent;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.phono.srtplight.Log;
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -19,7 +18,6 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
-import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.security.SecureRandom;
@@ -69,10 +67,6 @@ public class SimpleStunClientNio extends StunBindingTransaction {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
-        @Override
-        public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-        }
 
         @Override
         public int getMTU() {

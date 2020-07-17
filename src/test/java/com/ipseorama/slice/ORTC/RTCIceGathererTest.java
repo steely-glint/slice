@@ -12,7 +12,6 @@ import com.ipseorama.slice.ORTC.enums.RTCIceCredentialType;
 import com.ipseorama.slice.ORTC.enums.RTCIceGatherPolicy;
 import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
 import com.ipseorama.slice.SingleThreadNioIceEngine;
-import com.ipseorama.slice.ThreadedIceEngine;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
 import java.io.IOException;
@@ -60,11 +59,6 @@ public class RTCIceGathererTest {
         public StunTransactionManager getTransactionManager() {
             return null;
         }
-
-        @Override
-        public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) throws IOException {
-        }
-
         @Override
         public int getMTU() {
             return 1500;

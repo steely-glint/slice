@@ -70,10 +70,6 @@ public class SimpleStunClientNBIoT extends StunBindingTransaction {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
-        @Override
-        public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-        }
 
         @Override
         public int getMTU() {

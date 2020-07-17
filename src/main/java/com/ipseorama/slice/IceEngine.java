@@ -26,8 +26,6 @@ public interface IceEngine {
 
     public StunTransactionManager getTransactionManager();
 
-    public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) throws IOException ;
-
     public int getMTU();
     
     public long nextAvailableTime();

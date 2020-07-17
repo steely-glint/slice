@@ -21,7 +21,7 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
     private RTCIceRole role;
     private final long tiebreaker;
     private final String outboundUser;
-    private final boolean mayNominate;
+    private final boolean nominate;
     private RTCIceCandidatePair candidatePair;
 
     public IceStunBindingTransaction(IceEngine ice, String host, int port,
@@ -29,14 +29,15 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
             RTCIceRole role,
             long tiebreaker,
             String outboundUser,
-    boolean mayNominate) {
+    boolean nominate) {
         super(ice, host, port);
         this.reflexPri = reflexPri;
         this.role = role;
         this.tiebreaker = tiebreaker;
         this.outboundUser = outboundUser;
-        this.mayNominate = mayNominate;
+        this.nominate = nominate;
     }
+
 
     @Override
     public StunPacket buildOutboundPacket() {
@@ -54,7 +55,7 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         StunAttribute.addUsername(attrs, outboundUser);
         StunAttribute.addSoftware(attrs);
         StunAttribute.addIceCon(attrs, role, tiebreaker);
-        if (mayNominate && role.equals(RTCIceRole.CONTROLLING)){
+        if (nominate && role.equals(RTCIceRole.CONTROLLING)){
             StunAttribute.addUseCandidate(attrs);
         }
         StunAttribute.addMessageIntegrity(attrs);
@@ -71,7 +72,7 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         return role.equals(RTCIceRole.CONTROLLING);
     }
     @Override
-    public void received(StunPacket r) {
+    public void receivedReply(StunPacket r) {
         if (r instanceof StunBindingResponse) {
             response = (StunBindingResponse) r;
             if (response.hasRequiredAttributes()) {
@@ -110,5 +111,13 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
     }
     public RTCIceCandidatePair getPair(){
         return candidatePair;
+    }
+    
+    public boolean nominationransaction(){
+        boolean ret = nominate;
+        if (inbound != null){
+            ret = inbound.hasAttribute("USE-CANDIDATE");
+        }
+        return ret;
     }
 }

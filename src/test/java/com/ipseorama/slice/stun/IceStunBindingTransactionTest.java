@@ -11,16 +11,11 @@ import com.phono.srtplight.Log;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.nio.channels.Selector;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.crypto.ShortBufferException;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -80,10 +75,6 @@ public class IceStunBindingTransactionTest {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
 
-            @Override
-            public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
 
             @Override
             public int getMTU() {

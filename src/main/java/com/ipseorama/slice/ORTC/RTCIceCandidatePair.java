@@ -9,32 +9,44 @@ import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.stun.IceStunBindingTransaction;
-import com.ipseorama.slice.stun.StunBindingResponse;
-import com.ipseorama.slice.stun.StunBindingTransaction;
+import com.ipseorama.slice.stun.StunBindingRequest;
+import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransaction;
+import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author tim
  */
 public class RTCIceCandidatePair implements RTCEventData {
-
+    
+    private static int COUNT = 0;
+    
     private final RTCLocalIceCandidate local;
     private final RTCIceCandidate remote;
     private RTCIceCandidatePairState state;
-    private boolean nominated;
     public EventHandler onDtls;
     public EventHandler onRTP;
     public EventHandler onRevoke;
-    private boolean triggerHadUseCandidateSet;
-
+    public EventHandler onStateChange;
+    
+    private final String name;
+    private boolean checkedIn = false;
+    private boolean checkedOut = false;
+    private InetSocketAddress farIP;
+    
     RTCIceCandidatePair(RTCLocalIceCandidate local, RTCIceCandidate remote) {
         this.local = local;
         this.remote = remote;
-        this.state = RTCIceCandidatePairState.WAITING;
+        this.name = "RTCIceCandidatePair-" + (COUNT++);
     }
 
     /**
@@ -50,12 +62,12 @@ public class RTCIceCandidatePair implements RTCEventData {
     public RTCIceCandidate getRemote() {
         return remote;
     }
-
+    
     public long priority(RTCIceRole localRole) {
-
+        
         long g;
         long d;
-
+        
         if (localRole == RTCIceRole.CONTROLLING) {
             g = local.getPriority();
             d = remote.getPriority();
@@ -72,56 +84,133 @@ public class RTCIceCandidatePair implements RTCEventData {
     public RTCIceCandidatePairState getState() {
         return state;
     }
-
+    
     public void setState(RTCIceCandidatePairState newState) {
-        state = newState;
+        Log.debug("CandidatePair " + name + " state " + state + " -> " + newState);
+        this.state = newState;
+        if (this.onStateChange != null) {
+            onStateChange.onEvent(newState);
+        }
     }
-
+    
     public String toString() {
-        return "CandidatePair is " + this.state.toString().toUpperCase() + "\n\tlocal :" + local.toString() + "\n\tremote :" + remote.toString();
+        return name + " (" + this.state.toString().toUpperCase() + " )\n\tlocal :" + local.toString() + "\n\tremote :" + remote.toString();
     }
-
+    
     boolean sameEnough(RTCIceCandidate t_near, RTCIceCandidate t_far) {
         return getLocal().sameEnoughIncludingWildCard(t_near) && getRemote().sameEnough(t_far);
     }
-
+    
     StunTransaction trigger(RTCIceTransport trans) {
-        this.triggerHadUseCandidateSet = nominated;
-        StunTransaction ret = createTransaction(trans, "outbound triggered");
-        Log.debug("Triggering new check "+ret+" with nomination "+nominated);
-
+        StunTransaction ret = createAnOutBoundTransaction(trans, "outbound check triggered", false);
         return ret;
     }
-
+    
+    StunTransaction triggerNomination(RTCIceTransport trans) {
+        StunTransaction ret = createAnOutBoundTransaction(trans, "outbound nomination triggered", true);
+        return ret;
+    }
+    
     public StunTransaction queued(RTCIceTransport trans) {
-        StunTransaction ret = createTransaction(trans, "outbound queued");
+        StunTransaction ret = createAnOutBoundTransaction(trans, "outbound check queued", false);
         return ret;
     }
-
-    StunTransaction createTransaction(RTCIceTransport trans, String cause) {
+    
+    void sentOutbound() {
+        if (this.state == RTCIceCandidatePairState.WAITING) {
+            this.setState(RTCIceCandidatePairState.INPROGRESS);
+        }
+    }
+    
+    StunTransaction createAnOutBoundTransaction(RTCIceTransport trans, String cause, boolean nominate) {
+        if (this.state == RTCIceCandidatePairState.FROZEN) {
+            state = RTCIceCandidatePairState.WAITING;
+        }
         String host = this.remote.getIp();
         int port = (int) this.remote.getPort();
         RTCIceRole role = trans.getRole();
         long reflexPri = priority(role);
         IceEngine ice = trans.iceGatherer.getIceEngine();
-
+        
         long tiebreaker = trans.getTieBreaker();
+        final RTCIceCandidatePair pair = this;
+        
         String outboundUser = trans.getRemoteParameters().usernameFragment + ":" + trans.getLocalParameters().usernameFragment;
-
-        boolean mayNominate = (trans.selectedPair == null);
         IceStunBindingTransaction ret = new IceStunBindingTransaction(ice, host, port,
                 (int) reflexPri,
                 role,
                 tiebreaker,
-                outboundUser,mayNominate);
+                outboundUser, nominate) {
+            
+            @Override
+            public StunPacket buildOutboundPacket() {
+                pair.sentOutbound();
+                return super.buildOutboundPacket();
+            }
+        };
         ret.setCause(cause);
         ret.setPair(this);
         ret.setChannel(local.getChannel());
+        ret.oncomplete = (RTCEventData data) -> {
+            checkedOut = true;
+            // well, this way works.
+            Log.debug("got a reply to " + ret);
+            if (checkedIn) {
+                // they have already sent us something...
+                this.setState(RTCIceCandidatePairState.SUCCEEDED);
+            }
+            if (nominate) {
+                try {
+                    Log.debug("nominating.... " + ret);
+                    farIP = ret.getFar();
+                    this.local.getChannel().connect(farIP);
+                    this.setState(RTCIceCandidatePairState.NOMINATED);
+                } catch (IOException ex) {
+                    Log.error("Can't connect " + this.toString());
+                }
+            }
+        };
         return ret;
     }
 
-    public void updateState(RTCEventData e) {
-        /*
+    /*
+    2.3.  Nominating Candidate Pairs and Concluding ICE
+
+   ICE assigns one of the ICE agents in the role of the controlling
+   agent, and the other in the role of the controlled agent.  For each
+   component of a data stream, the controlling agent nominates a valid
+   pair (from the valid list) to be used for data.  The exact timing of
+   the nomination is based on local policy.
+
+   When nominating, the controlling agent lets the checks continue until
+   at least one valid pair for each component of a data stream is found,
+   and then it picks a valid pair and sends a STUN request on that pair,
+   using an attribute to indicate to the controlled peer that it has
+   been nominated.  This is shown in Figure 4.
+
+             L                        R
+             -                        -
+             STUN request ->             \  L's
+                       <- STUN response  /  check
+
+                        <- STUN request  \  R's
+             STUN response ->            /  check
+
+             STUN request + attribute -> \  L's
+                       <- STUN response  /  check
+
+                           Figure 4: Nomination
+
+   Once the controlled agent receives the STUN request with the
+   attribute, it will check (unless the check has already been done) the
+   same pair.  If the transactions above succeed, the agents will set
+   the nominated flag for the pairs and will cancel any future checks
+   for that component of the data stream.  Once an agent has set the
+   nominated flag for each component of a data stream, the pairs become
+   the selected pairs.  After that, only the selected pairs will be used
+   for sending and receiving data associated with that data stream.
+     */
+ /*
         6.1.2.4.2.3. Updating Pair States
 
 The agent sets the state of the pair that *generated* the check to Succeeded. Note that, the pair which *generated* the check may be different than the valid pair constructed in Section 6.1.2.4.2.2 as a consequence of the response. The success of this check might also cause the state of other checks to change as well. The agent MUST perform the following two steps:
@@ -133,66 +222,24 @@ If the check list is frozen, and there is at least one pair in the check list wh
 If the check list is frozen, and there are no pairs in the check list whose foundation matches a pair in the valid list under consideration, the agent
 groups together all of the pairs with the same foundation, and
 for each group, sets the state of the pair with the lowest component ID to Waiting. If there is more than one such pair, the one with the highest-priority is used.
-         */
+     */
  /*
 Each candidate pair in the check list has a foundation and a state. The foundation is the combination of the foundations of the local and remote candidates in the pair. The state is assigned once the check list for each media stream has been computed. There are five potential values that the state can have:
 
-Waiting:
-A check has not been performed for this pair, and can be performed as soon as it is the highest-priority Waiting pair on the check list.
-In-Progress:
-A check has been sent for this pair, but the transaction is in progress.
-Succeeded:
-A check for this pair was already done and produced a successful result.
-Failed:
-A check for this pair was already done and failed, either never producing any response or producing an unrecoverable failure response.
-Frozen:
-A check for this pair hasn't been performed, and it can't yet be performed until some other check succeeds, allowing this pair to unfreeze and move into the Waiting state.
 
-         */
-        Log.debug("update pair state based on transaction completion " + e.toString());
-        if (e instanceof RTCTimeoutEvent) {
-            this.setState(RTCIceCandidatePairState.FAILED);
-        } else if (e instanceof StunBindingTransaction) {
-            StunBindingTransaction sbt = (StunBindingTransaction) e;
-            StunBindingResponse sbr = sbt.getResponse();
-            // todo depending on what this looks like we may want to nominate this one.
-            if (sbr.hasAttribute("USE-CANDIADTE")) {
-                this.nominated = true;
-            } else if (sbt instanceof IceStunBindingTransaction) {
-                if (((IceStunBindingTransaction) sbt).sentUseCandidate()) {
-                    this.nominated = true;
-                }
-            }
-            if (this.state == RTCIceCandidatePairState.INPROGRESS){
-                this.nominated = triggerHadUseCandidateSet;
-                Log.debug("using nomination status from trigger");
-            }
-            this.setState(RTCIceCandidatePairState.SUCCEEDED);
-        }
-    }
-
-    public boolean isNominated() {
-        return nominated;
-    }
-
-    void setNominated(boolean b) {
-        nominated = b;
-    }
-
+     */
+// TODO - unconvinced this is the right place for these.
     public void pushDTLS(byte[] rec, InetSocketAddress near, InetSocketAddress far) {
         if (onDtls != null) {
             //if (getLocal().sameSocketAddress(near) && getRemote().sameSocketAddress(far)){
             RTCDtlsPacket dat = new RTCDtlsPacket();
             dat.data = rec;
             onDtls.onEvent(dat);
-            //} else {
-            //    Log.debug("dtls packet doesn't match selected candidate "+ this.toString()+ " vs " +far +" -> "+ near );
-            //}
         } else {
             Log.debug("dumping dtls packet - no place to push it.");
         }
     }
-
+    
     public void pushRTP(DatagramPacket dgp) {
         if (onRTP != null) {
             RTCRtpPacket dat = new RTCRtpPacket();
@@ -203,7 +250,7 @@ A check for this pair hasn't been performed, and it can't yet be performed until
             Log.debug("dumping rtp packet - no place to push it.");
         }
     }
-
+    
     public void onRevoke() {
         if (onRevoke != null) {
             onRevoke.onEvent(null);
@@ -212,5 +259,46 @@ A check for this pair hasn't been performed, and it can't yet be performed until
             Log.debug("no one listening for onRevoke events");
         }
     }
-
+    
+    void recvdInbound(StunBindingRequest sbr, RTCIceTransport transp, StunTransactionManager m) {
+        checkedIn = true;
+        if (sbr.hasAttribute("USE-CANDIDATE")) {
+            if (state == RTCIceCandidatePairState.SUCCEEDED) {
+                setState(RTCIceCandidatePairState.NOMINATED);
+            }
+        }
+        if (!checkedOut) {
+            StunTransaction tr = trigger(transp);
+            if (tr != null) {
+                m.addTransaction(tr);
+            }
+        } else {
+            if (state == RTCIceCandidatePairState.INPROGRESS) {
+                setState(RTCIceCandidatePairState.SUCCEEDED);
+            }
+        }
+    }
+    
+    public boolean isNominateable() {
+        return (state == RTCIceCandidatePairState.SUCCEEDED) && checkedIn && checkedOut;
+    }
+    
+    public InetSocketAddress getFarIp() {
+        return farIP;
+    }
+    
+    public void sendTo(byte[] buf, int off, int len) throws IOException {
+        if (state == RTCIceCandidatePairState.NOMINATED) {
+            DatagramChannel ch = getLocal().getChannel();
+            ByteBuffer src = ByteBuffer.wrap(buf, off, len);
+            try {
+                ch.write(src);
+            } catch (IOException x) {
+                Log.warn("Error sending to " + name);
+                throw x;
+            }
+        } else {
+            Log.warn("cant send : "+name+" not selected.");
+        }
+    }
 }

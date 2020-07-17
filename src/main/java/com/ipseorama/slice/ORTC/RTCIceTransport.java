@@ -33,7 +33,7 @@ import java.util.Optional;
  * @author tim
  */
 public class RTCIceTransport {
-
+    
     static int MAXCHECKS = 100;
     RTCIceGatherer iceGatherer;
     RTCIceRole role;
@@ -43,30 +43,26 @@ public class RTCIceTransport {
     List<RTCIceCandidate> remoteCandidates;
     List<RTCIceCandidatePair> candidatePairs;
     RTCIceCandidatePair selectedPair;
-
+    
     private final Comparator<RTCIceCandidatePair> ordering;
     private long tieBreaker;
     private StunTransactionManager transMan;
     private InetSocketAddress dtlsTo;
     private IceEngine ice;
-
-    public RTCIceTransportState getRTCIceTransportState() {
-        return state;
-    }
-
+    
     public List<RTCIceCandidate> getRemoteCandidates() {
         return remoteCandidates;
     }
-
+    
     public RTCIceCandidatePair getSelectedCandidatePair() {
         return selectedPair;
     }
-
+    
     public void start(RTCIceGatherer gatherer, RTCIceParameters remoteParameters, RTCIceRole role) {
         // for the moment we will ignore the new values and assume that the constructor was right....
         // and ignore the re-start semantics.
         ice = gatherer.getIceEngine();
-
+        
         this.transMan = gatherer.getStunTransactionManager();
         transMan.setTransport(this);
         final EventHandler oldAct = gatherer.onlocalcandidate;
@@ -86,24 +82,24 @@ public class RTCIceTransport {
                 oldAct.onEvent(c);
             }
         };
-
+        
     }
-
+    
     public void stop() {
     }
-
+    
     public RTCIceParameters getRemoteParameters() {
         return remoteParameters;
     }
-
+    
     public RTCIceParameters getLocalParameters() {
         return this.iceGatherer.getLocalParameters();
     }
-
+    
     RTCIceTransport createAssociatedTransport() {
         return null; // don't do this - rtcp-mux is good.
     }
-
+    
     public void addRemoteCandidate(RTCIceGatherCandidate remoteCandidate) {
         if (remoteCandidate instanceof RTCIceCandidate) {
             RTCIceCandidate r = (RTCIceCandidate) remoteCandidate;
@@ -118,17 +114,17 @@ public class RTCIceTransport {
             // assume end-of-candidates....
         }
     }
-
+    
     public void setRemoteCandidates(List<RTCIceCandidate> remoteCandidates) {
         // assumption is that this blatts the existing list - so we need to
         // compare and selectively add/delete - I suppose?!?
         // ignore for now.
         // assume all candidates are added vi addRemoteCandidate ;-)
     }
-
+    
     public EventHandler onstatechange;
     public EventHandler oncandidatepairchange;
-
+    
     public RTCIceTransport(RTCIceGatherer ig,
             RTCIceRole r,
             RTCIceComponent comp) {
@@ -161,41 +157,82 @@ public class RTCIceTransport {
             onstatechange.onEvent(newstate);
         }
     }
-
-    private void addPair(RTCLocalIceCandidate l, RTCIceCandidate r) {
+    
+    private RTCIceCandidatePair addPair(RTCLocalIceCandidate l, RTCIceCandidate r) {
+        RTCIceCandidatePair ret = null;
+        if (state == RTCIceTransportState.NEW) {
+            setState(RTCIceTransportState.CHECKING);
+        }
         if (l.getProtocol() == r.getProtocol() && l.getIpVersion() == r.getIpVersion()) {
             synchronized (candidatePairs) {
                 boolean present = candidatePairs.stream().anyMatch((RTCIceCandidatePair p) -> {
-                    return p.getLocal().equals(l) && p.getRemote().equals(r);
+                    return (l.sameFoundation(p.getLocal()) && r.sameFoundation(p.getRemote()));
                 });
                 if (!present) {
                     RTCIceCandidatePair p = new RTCIceCandidatePair(l, r);
                     if (p != null) {
+                        p.setState(RTCIceCandidatePairState.FROZEN);
+                        ret = p;
                         candidatePairs.add(p);
+                        p.onStateChange = (data) -> {
+                            this.pairChangedState(p);
+                        };
                         Log.debug("added candidate pair " + p.toString());
-                        transMan.maybeAddTransactionForPair(p);
                     }
                 } else {
-                    Log.debug("ignoring exisiting candidate pair " + r.toString() + " " + l.toString());
+                    Log.debug("ignoring due to exisiting candidate pair " + r.toString() + " " + l.toString());
                 }
             }
         } else {
-            Log.debug("ignoring incompatiple candidate pair " + r.toString() + " " + l.toString());
+            Log.verb("ignoring incompatiple candidate pair " + r.toString() + " " + l.toString());
         }
+        return ret;
     }
-
+    
     public RTCIceCandidatePair nextCheck() {
+        return nextCheck(RTCIceCandidatePairState.WAITING);
+    }
+    
+    public RTCIceCandidatePair nextCheck(RTCIceCandidatePairState targetState) {
         Optional<RTCIceCandidatePair> ret = null;
         synchronized (candidatePairs) {
             ret = candidatePairs.stream()
                     .sorted(ordering)
                     .limit(MAXCHECKS)
                     .filter((RTCIceCandidatePair icp) -> {
-                        return icp.getState() == RTCIceCandidatePairState.WAITING;
+                        return icp.getState() == targetState;
                     })
                     .findFirst();
         }
         return ret.isPresent() ? ret.get() : null;
+    }
+    
+    private boolean checkRoleOk(StunBindingRequest sbr) {
+        boolean ret = true;
+        if (role == RTCIceRole.CONTROLLED) {
+            if (sbr.hasAttribute("ICE-CONTROLLED")) {
+                //eeek. clash of roles.
+                boolean big = !sbr.localAgentHasBiggerTieBreaker(this.tieBreaker, "ICE-CONTROLLED");
+                if (big) {
+                    ret = false;
+                } else {
+                    role = RTCIceRole.CONTROLLING;
+                }
+            }
+        }
+        if (role == RTCIceRole.CONTROLLING) {
+            if (sbr.hasAttribute("ICE-CONTROLLING")) {
+                //eeek. clash of roles.
+                boolean big = sbr.localAgentHasBiggerTieBreaker(this.tieBreaker, "ICE-CONTROLLING");
+                if (big) {
+                    StunErrorTransaction err = new StunErrorTransaction(ice, sbr);
+                    ret = false;
+                } else {
+                    role = RTCIceRole.CONTROLLED;
+                }
+            }
+        }
+        return ret;
     }
 
     /**
@@ -207,9 +244,9 @@ public class RTCIceTransport {
      * @param ipv
      * @return
      */
-    public List<StunTransaction> received(StunPacket p, RTCIceProtocol prot, int ipv) {
+    public List<StunTransaction> receivedNew(StunPacket p, RTCIceProtocol prot, int ipv) {
         List<StunTransaction> ret = null;
-
+        
         if (p instanceof StunBindingRequest) {
             // todo someone should check that the name/pass is right - who and how ?
             // check for required attributes.
@@ -219,71 +256,26 @@ public class RTCIceTransport {
             if (sbr.hasRequiredIceAttributes()) {
                 ret = new ArrayList();
                 if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
-                    RTCIceCandidatePair inbound = findMatchingPair(sbr, prot, ipv);
-                    if ((selectedPair != null) && (inbound != selectedPair)) {
+                    RTCIceCandidatePair pair = findMatchingPair(sbr, prot, ipv);
+                    if ((selectedPair != null) && (pair != selectedPair)) {
                         Log.verb("We have a selected pair - ignoring this..." + sbr);
                         return (ret);
                     }
-                    if (inbound == null) {
+                    if (pair == null) {
                         Log.verb("about to mkpair from " + sbr.toString() + " ipv" + ipv);
-                        inbound = mkPair(sbr, prot, ipv);
-                        Log.verb("create pair " + inbound.toString() + " ipv" + ipv);
+                        pair = mkPair(sbr, prot, ipv);
+                        Log.verb("create pair " + pair.toString() + " ipv" + ipv);
                     }
-                    if (role == RTCIceRole.CONTROLLED) {
-                        if (sbr.hasAttribute("ICE-CONTROLLED")) {
-                            //eeek. clash of roles.
-                            boolean big = !sbr.localAgentHasBiggerTieBreaker(this.tieBreaker, "ICE-CONTROLLED");
-                            if (big) {
-                                StunErrorTransaction err = new StunErrorTransaction(ice, sbr);
-                                ret.add(err);
-                                /*----> Early return*/
-                                return ret;
-                            } else {
-                                role = RTCIceRole.CONTROLLING;
-                            }
-                        } else {
-                            inbound.setNominated(p.hasAttribute("USE-CANDIDATE"));
-                        }
-                    }
-                    if (role == RTCIceRole.CONTROLLING) {
-                        if (sbr.hasAttribute("ICE-CONTROLLING")) {
-                            //eeek. clash of roles.
-                            boolean big = sbr.localAgentHasBiggerTieBreaker(this.tieBreaker, "ICE-CONTROLLING");
-                            if (big) {
-                                StunErrorTransaction err = new StunErrorTransaction(ice, sbr);
-                                ret.add(err);
-                                /*----> Early return*/
-                                return ret;
-                            } else {
-                                role = RTCIceRole.CONTROLLED;
-                            }
-                        }
-                    }
-                    //to do: some state update on the pair here.
-                    StunBindingTransaction replyTrans = new StunBindingTransaction(ice, sbr);
-                    replyTrans.setCause("inbound");
-                    Log.verb("adding " + replyTrans.toString() + " to do reply");
-                    ret.add(replyTrans);
-                    if (inbound.getState() != RTCIceCandidatePairState.SUCCEEDED) {
-                        // questionable state - so trigger a reverse check for this one.
-                        StunTransaction triggeredTrans = inbound.trigger(this);
-                        Log.verb("adding new Rtans " + triggeredTrans.toString() + " for trigger");
-                        ret.add(triggeredTrans);
-                        final RTCIceCandidatePair mypair = inbound;
-                        mypair.setState(RTCIceCandidatePairState.INPROGRESS);
-                        triggeredTrans.oncomplete = (RTCEventData e) -> {
-                            Log.verb("triggered Rtans check complete. do something here " + triggeredTrans);
-                            //to do: some state update on the pair here.
-
-                            mypair.updateState(e);
-                        };
-                        triggeredTrans.onerror = (RTCEventData e) -> {
-                            onError(e);
-                        };
+                    StunTransaction replyTrans = null;
+                    if (checkRoleOk(sbr)) {
+                        replyTrans = new StunBindingTransaction(ice, sbr);
+                        replyTrans.setCause("inbound");
+                        pair.recvdInbound(sbr, this, transMan);
+                        Log.verb("adding " + replyTrans.toString() + " to do reply");
                     } else {
-                        Log.verb("Candidate Pair already SUCCEEDED no need to trigger -" + inbound);
+                        replyTrans = new StunErrorTransaction(ice, sbr);
                     }
-
+                    ret.add(replyTrans);
                 } else {
                     Log.verb("Ignored bining transaction - wrong user");
                 }
@@ -291,7 +283,7 @@ public class RTCIceTransport {
         }
         return ret;
     }
-
+    
     public RTCIceCandidatePair findMatchingPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
         /*InetSocketAddress near = p.getNear();
         InetSocketAddress far = p.getFar();*/
@@ -306,11 +298,11 @@ public class RTCIceTransport {
         }
         return cp.isPresent() ? cp.get() : null;
     }
-
+    
     private RTCIceCandidatePair mkPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
         long pri = p.getPriority();
         DatagramChannel ch = p.getChannel();
-        RTCLocalIceCandidate t_near = RTCLocalIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri,ch);
+        RTCLocalIceCandidate t_near = RTCLocalIceCandidate.mkTempCandidate(p.getNear(), prot, ipv, pri, ch);
         RTCIceCandidate t_far = RTCIceCandidate.mkTempCandidate(p.getFar(), prot, ipv, pri);
         Optional<RTCIceCandidate> fopt;
         synchronized (remoteCandidates) {
@@ -323,13 +315,9 @@ public class RTCIceTransport {
             return r.sameEnough(t_near);
         }).findAny();
         RTCLocalIceCandidate near = nopt.orElse(t_near);
-        RTCIceCandidatePair ret = new RTCIceCandidatePair(near, far);
-        synchronized (candidatePairs) {
-            candidatePairs.add(ret);
-        }
-        return ret;
+        return addPair(near, far);
     }
-
+    
     RTCIceRole getRole() {
         return this.role;
     }
@@ -340,61 +328,45 @@ public class RTCIceTransport {
     public long getTieBreaker() {
         return tieBreaker;
     }
-
+    
     private List<RTCLocalIceCandidate> getLocalCandidates() {
         return this.iceGatherer.getLocalCandidates();
     }
-
-    public RTCIceCandidatePair findValidNominatedPair() {
-        Optional<RTCIceCandidatePair> npair = null;
-        synchronized (candidatePairs) {
-            npair = candidatePairs.stream().filter((RTCIceCandidatePair r) -> {
-                return r.isNominated() && r.getState() == RTCIceCandidatePairState.SUCCEEDED;
-            }).findAny(); // strictly we should order this by priority and _find first_
-        }
-        RTCIceCandidatePair ret = npair.isPresent() ? npair.get() : null;
-        //Log.verb("selected pair          "+ret);
-        //Log.verb("old selected pair was  "+selectedPair);
-        RTCIceCandidatePair tSel = selectedPair;
-        if (ret != tSel) {
-            Log.debug("have new selected pair " + ret);
-            Log.debug("old selected pair was  " + tSel);
-
-            if (tSel == null) {
-                //this.pruneExcept(ret);
-                Log.warn("Not pruning pairs to see what happens....");
-                this.setState(RTCIceTransportState.CONNECTED);
-                dtlsTo = new InetSocketAddress(ret.getRemote().getIp(), ret.getRemote().getPort());
+    
+    public void triggerNominatablePair() {
+        Optional<RTCIceCandidatePair> npair;
+        if ((this.role == role.CONTROLLING)) {
+            Log.debug("Looking for a nominateable pair  ");
+            // lets try and nominate something....
+            synchronized (candidatePairs) {
+                npair = candidatePairs.stream().filter((RTCIceCandidatePair r) -> {
+                    return (r.isNominateable());
+                }).findFirst(); // strictly we should order this by priority and _find first_
             }
-            if (ret == null) {
-                this.setState(RTCIceTransportState.DISCONNECTED);
-                dtlsTo = null;
-            } else {
-                if (null != this.oncandidatepairchange) {
-                    oncandidatepairchange.onEvent(ret);
+            if (npair.isPresent()) {
+                RTCIceCandidatePair nomnom = npair.get();
+                Log.debug("Triggering a nomination  on " + nomnom);
+                StunTransaction tra = nomnom.triggerNomination(this);
+                if (tra != null) {
+                    this.transMan.addTransaction(tra);
                 }
-                selectedPair = ret;
             }
         }
-        return ret;
     }
-
+    
     public RTCIceTransportState getState() {
         return this.state;
     }
-
+    
     public void sendDtlsPkt(byte[] buf, int off, int len) throws IOException {
-        Log.verb("Will send dtls packet to " + dtlsTo);
-        IceEngine ice = this.iceGatherer.getIceEngine();
-
-        if (dtlsTo != null) {
-            ice.sendTo(buf, off, len, dtlsTo);
+        Log.verb("Will send packet on " + selectedPair);        
+        if (selectedPair != null) {
+            selectedPair.sendTo(buf, off, len);
         } else {
-            throw new IOException("Null selected pair, can't send DTLS");
+            throw new IOException("Null selected pair, can't send non ice packet yet");
         }
-        // in effect use selectedPair  to send packet.
     }
-
+    
     public void onError(RTCEventData e) {
         Log.warn("triggered Rtans error");
         if ((e != null) && (e instanceof StunAttribute.ErrorAttribute)) {
@@ -407,17 +379,12 @@ public class RTCIceTransport {
             }
         }
     }
-
-    public void disconnected(RTCIceCandidatePair selected) {
-        Log.debug("IceTransport disconnected ...because no packets received on " + selected == null ? "" : selected.toString());
-        this.setState(RTCIceTransportState.DISCONNECTED);
-    }
-
+    
     public int getMTU() {
         IceEngine ice = this.iceGatherer.getIceEngine();
         return ice.getMTU();
     }
-
+    
     public void pruneExcept(RTCIceCandidatePair sp) {
         if (sp != null) {
             transMan.pruneExcept(sp);
@@ -426,6 +393,71 @@ public class RTCIceTransport {
             nsp.add(sp);
             candidatePairs = nsp;
             Log.debug("pruned candidate Pairs to _just_ selected pair");
+        }
+    }
+    
+    public void listPairs() {
+        candidatePairs.forEach((p) -> {
+            Log.debug(p.toString());
+        });
+    }
+    
+    public boolean setSelected(RTCIceCandidatePair sel) {
+        boolean ret = false;
+        if (sel != selectedPair) {
+            if ((selectedPair == null) || (sel == null)) {
+                selectedPair = sel;
+                if (selectedPair != null){
+                    ret = true;
+                    
+                }else {
+                    dtlsTo = null;
+                }
+                if (oncandidatepairchange != null){
+                    Log.debug("candiate pair changed");
+                    oncandidatepairchange.onEvent(sel);
+                } else {
+                    Log.warn("No one listening to candidate pair changes");
+                }
+            } else {
+                Log.error("Trying to swap slelected pair ?!?");
+            }
+        } else {
+            Log.warn("duplicate pair selection");
+        }
+        return ret;
+    }
+    
+    public void disconnectedSelected() {
+        Log.debug("IceTransport disconnected ...because no packets received on " + selectedPair == null ? "" : selectedPair.toString());
+        this.setState(RTCIceTransportState.DISCONNECTED);
+    }
+    
+    private void pairChangedState(RTCIceCandidatePair p) {
+        
+        RTCIceCandidatePairState pstate = p.getState();
+        switch (pstate) {
+            case SUCCEEDED:
+                if (this.state == RTCIceTransportState.CHECKING) {
+                    this.setState(RTCIceTransportState.CONNECTED);
+                    this.triggerNominatablePair();
+                }
+                break;
+            case NOMINATED:
+                if (this.state == RTCIceTransportState.CONNECTED) {
+                    if (setSelected(p)) {
+                        this.setState(RTCIceTransportState.COMPLETED);
+                    }
+                }
+                break;
+            case FAILED:
+                if (p == selectedPair) {
+                    this.setState(RTCIceTransportState.DISCONNECTED);
+                    // strictly we could/should go looking for something else that works and nominate that.
+                    // TODO...
+                    this.setSelected(null);
+                }
+                break;
         }
     }
 }

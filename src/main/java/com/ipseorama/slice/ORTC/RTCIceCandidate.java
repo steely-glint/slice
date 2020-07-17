@@ -339,5 +339,10 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     }
 
 
+    boolean sameFoundation(RTCIceCandidate other) {
+        return foundation.equals(other.foundation);
+    }
+
+
 
 }

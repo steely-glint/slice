@@ -5,20 +5,18 @@
  */
 package com.ipseorama.slice;
 
+import com.ipseorama.slice.ORTC.EventHandler;
 import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import com.ipseorama.slice.ORTC.RTCIceTransport;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
+import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.SocketAddress;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
@@ -38,7 +36,7 @@ import java.util.Set;
  */
 public class SingleThreadNioIceEngine implements IceEngine {
 
-    StunTransactionManager _trans;
+    StunTransactionManager _transM;
     private Selector _selector;
     private Thread _rcv;
     private boolean _started = false;
@@ -47,8 +45,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
     static int Ta = 5;
     private int mtu = StunPacket.MTU;
     private Map<String, String> miPass = new HashMap();
-    private RTCIceCandidatePair selected;
     long nextAvailableTime;
+    private RTCIceCandidatePair selected;
 
     public synchronized void start(Selector s, StunTransactionManager tm) {
         if (_started) {
@@ -56,9 +54,34 @@ public class SingleThreadNioIceEngine implements IceEngine {
         }
         nextAvailableTime = System.currentTimeMillis();
         _selector = s;
+        _transM = tm;
+        RTCIceTransport transP = tm.getTransport();
+        if (transP != null) {
+            EventHandler chain = transP.onstatechange;
+            transP.onstatechange = (data) -> {
+                if (chain != null) {
+                    chain.onEvent(data);
+                }
+                RTCIceTransportState tstate = transP.getState();
+                Log.debug("Transport state is now " + tstate.toString().toUpperCase());
+                switch (tstate) {
+                    case COMPLETED:
+                        selected = transP.getSelectedCandidatePair();
+                        Log.debug("SELECTED ->> " + selected);
+                        break;
+                    case CONNECTED:
+                        break;
+                    case DISCONNECTED:
+                    case FAILED:
+                        // strictly these aren't synonyms. 
+                        Log.debug("Failed ->> " + selected);
+                        selected = null;
+                        break;
+                }
+            };
+        }
 
-        _trans = tm;
-        if ((_selector == null) || (_trans == null)) {
+        if ((_selector == null) || (_transM == null)) {
             throw new java.lang.IllegalArgumentException("Need non-null selector and transaction manager to start");
         }
 
@@ -101,22 +124,27 @@ public class SingleThreadNioIceEngine implements IceEngine {
             packetRxTime = System.currentTimeMillis();
             while (_rcv != null) {
                 Long delay = tx();
+                if (Log.getLevel() >= Log.DEBUG) {
+                    Log.debug("-----> candidate Pair States <------");
+                    _transM.listPairs();
+                }
                 rx(delay);
             }
             Log.debug("quit ICE rcv loop");
-            _trans.getTransport().disconnected(selected);
+            _transM.getTransport().disconnectedSelected();
         } catch (SocketException ex) {
             Log.error("Can't set timer in rcv loop");
         }
     }
 
-    private void readPacket(SelectionKey key) throws Exception {
+    private boolean readPacket(SelectionKey key) throws Exception {
         ByteBuffer recbuf = ByteBuffer.allocate(mtu);
         DatagramChannel dgc = (DatagramChannel) key.channel();
         InetSocketAddress far = (InetSocketAddress) dgc.receive(recbuf);
         if (far == null) {
             // early return ----> 
-            return;
+            Log.debug("Empty read far address");
+            return false;
         }
         InetSocketAddress near = (InetSocketAddress) dgc.getLocalAddress();
         int ipv = far.getAddress() instanceof java.net.Inet4Address ? 4 : 6;
@@ -138,11 +166,11 @@ public class SingleThreadNioIceEngine implements IceEngine {
          */
         byte b = rec[0];
         if ((b < 2) && (b >= 0)) {
-            StunPacket rp = StunPacket.mkStunPacket(rec, miPass, near, _trans);
+            StunPacket rp = StunPacket.mkStunPacket(rec, miPass, near, _transM);
             rp.setFar(far);
             rp.setChannel(dgc);
             Log.verb(StunPacket.hexString(rp.getTid()) + "got packet type " + rp.getClass().getSimpleName() + " from " + far);
-            _trans.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
+            _transM.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
         } else if ((19 < b) && (b < 64)) {
             Log.debug("push inbound DTLS packet");
             if (selected != null) {
@@ -167,6 +195,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
             Log.verb("packet first byte " + b);
         }
         packetRxTime = System.currentTimeMillis();
+        return true;
     }
 
     private void rx(Long nextTime) throws SocketException {
@@ -192,8 +221,10 @@ public class SingleThreadNioIceEngine implements IceEngine {
             while (iter.hasNext()) {
 
                 SelectionKey key = iter.next();
-                if (key.isReadable()) {
-                    readPacket(key);
+                while (key.isReadable() && key.isValid()) {
+                    if (!readPacket(key)) {
+                        break;
+                    }
                 }
                 iter.remove();
             }
@@ -221,12 +252,11 @@ public class SingleThreadNioIceEngine implements IceEngine {
     }
 
     private Long tx() {
-        Long nextTime = null;
         try {
             long now = System.currentTimeMillis();
             List<StunPacket> tos = null;
             //synchronized (_trans) {
-            tos = _trans.transact(now);
+            tos = _transM.transact(now);
             for (StunPacket sp : tos) {
                 if (sp != null) {
                     byte o[] = sp.outboundBytes(miPass);
@@ -239,24 +269,18 @@ public class SingleThreadNioIceEngine implements IceEngine {
                     } else {
                         Log.verb("not sending packet to unresolved address");
                     }
-                    long next = _trans.nextDue();
-                    nextTime = next;
+
                 }
+            }
+            if ((tos == null) || tos.isEmpty()) {
+                _transM.makeWork();
             }
         } catch (Exception x) {
             Log.error("Exception in tx" + x.getMessage());
-            //if (Log.getLevel() >= Log.DEBUG) {
             x.printStackTrace();
-            //}
         }
-        // this is a tad expensive - perhaps we need to move it ?
-        // but ....
-        selected = _trans.findValidNominatedPair();
-        //if (selected != null) {
-            //_trans.removeComplete();
-        //} else {
-            Log.verb("not removing complete ICE stun transactions for now... ");
-        //}
+        long nextTime = _transM.nextDue();
+        Log.verb("not removing complete ICE stun transactions for now... ");
         return nextTime;
     }
 
@@ -267,20 +291,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
 
     @Override
     public StunTransactionManager getTransactionManager() {
-        return this._trans;
+        return this._transM;
     }
 
-    @Override
-    public void sendTo(byte[] buf, int off, int len, InetSocketAddress dtlsTo) throws IOException {
-
-        if (selected != null) {
-            DatagramChannel ch = selected.getLocal().getChannel();
-            ByteBuffer src = ByteBuffer.wrap(buf, off, len);
-            ch.send(src, dtlsTo);
-        } else {
-            Log.warn("no selected pair - so won't send non-ice packet");
-        }
-    }
 
     public void stop() {
         _rcv = null;

@@ -39,7 +39,7 @@ public class StunErrorTransaction extends StunTransaction implements RTCEventDat
     }
 
     @Override
-    public void received(StunPacket r) {
+    public void receivedReply(StunPacket r) {
         Log.warn("unexpected packet  into StunError transaction " + r.getClass().getSimpleName());
     }
 

@@ -39,7 +39,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
         _far = sbreq.getFar();
         inbound = sbreq;
         ice = e;
-        dueTime = ice.nextAvailableTime();
+        dueTime = System.currentTimeMillis(); // this is a reply - so _now_ is good.
         _channel = sbreq.getChannel();
     }
 
@@ -48,7 +48,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     }
 
     @Override
-    public void received(StunPacket r) {
+    public void receivedReply(StunPacket r) {
         if (r instanceof StunBindingResponse) {
             response = (StunBindingResponse) r;
             _ref = response.getReflex();

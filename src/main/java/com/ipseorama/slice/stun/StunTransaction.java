@@ -61,7 +61,7 @@ public abstract class StunTransaction {
      * pass it here for processing
      * @param r 
      */
-    public abstract void received(StunPacket r);
+    public abstract void receivedReply(StunPacket r);
 
     public abstract StunPacket buildOutboundPacket();
 
