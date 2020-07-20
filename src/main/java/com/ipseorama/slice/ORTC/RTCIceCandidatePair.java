@@ -19,17 +19,16 @@ import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.ArrayList;
 
 /**
  *
  * @author tim
  */
 public class RTCIceCandidatePair implements RTCEventData {
-    
+
     private static int COUNT = 0;
-    
+
     private final RTCLocalIceCandidate local;
     private final RTCIceCandidate remote;
     private RTCIceCandidatePairState state;
@@ -37,16 +36,18 @@ public class RTCIceCandidatePair implements RTCEventData {
     public EventHandler onRTP;
     public EventHandler onRevoke;
     public EventHandler onStateChange;
-    
+
     private final String name;
     private boolean checkedIn = false;
     private boolean checkedOut = false;
     private InetSocketAddress farIP;
-    
+    private final ArrayList<byte[]> packetStash;
+
     RTCIceCandidatePair(RTCLocalIceCandidate local, RTCIceCandidate remote) {
         this.local = local;
         this.remote = remote;
         this.name = "RTCIceCandidatePair-" + (COUNT++);
+        packetStash = new ArrayList();
     }
 
     /**
@@ -62,12 +63,12 @@ public class RTCIceCandidatePair implements RTCEventData {
     public RTCIceCandidate getRemote() {
         return remote;
     }
-    
+
     public long priority(RTCIceRole localRole) {
-        
+
         long g;
         long d;
-        
+
         if (localRole == RTCIceRole.CONTROLLING) {
             g = local.getPriority();
             d = remote.getPriority();
@@ -84,25 +85,36 @@ public class RTCIceCandidatePair implements RTCEventData {
     public RTCIceCandidatePairState getState() {
         return state;
     }
-    
+
     public void setState(RTCIceCandidatePairState newState) {
         Log.debug("CandidatePair " + name + " state " + state + " -> " + newState);
         this.state = newState;
+        if (this.state == state.NOMINATED) {
+            connectChannel();
+
+        }
         if (this.onStateChange != null) {
             onStateChange.onEvent(newState);
         }
     }
-    
+
     public String toString() {
         return name + " (" + this.state.toString().toUpperCase() + " )\n\tlocal :" + local.toString() + "\n\tremote :" + remote.toString();
     }
-    
+
     boolean sameEnough(RTCIceCandidate t_near, RTCIceCandidate t_far) {
         return getLocal().sameEnoughIncludingWildCard(t_near) && getRemote().sameEnough(t_far);
     }
-    
+
     StunTransaction trigger(RTCIceTransport trans) {
         StunTransaction ret = createAnOutBoundTransaction(trans, "outbound check triggered", false);
+        return ret;
+    }
+
+    StunTransaction triggerNominated(RTCIceTransport trans) {
+        // subtle thing here - even thogh we set Nominate to _true_ USE-CANDIDATE won't be set because we are 
+        // CONTROLLED - meaning that the only impact is the the _reply_ to this transaction will NOMINATE this pair
+        StunTransaction ret = createAnOutBoundTransaction(trans, "outbound check triggered by nomination", true);
         return ret;
     }
     
@@ -110,18 +122,18 @@ public class RTCIceCandidatePair implements RTCEventData {
         StunTransaction ret = createAnOutBoundTransaction(trans, "outbound nomination triggered", true);
         return ret;
     }
-    
+
     public StunTransaction queued(RTCIceTransport trans) {
         StunTransaction ret = createAnOutBoundTransaction(trans, "outbound check queued", false);
         return ret;
     }
-    
+
     void sentOutbound() {
         if (this.state == RTCIceCandidatePairState.WAITING) {
             this.setState(RTCIceCandidatePairState.INPROGRESS);
         }
     }
-    
+
     StunTransaction createAnOutBoundTransaction(RTCIceTransport trans, String cause, boolean nominate) {
         if (this.state == RTCIceCandidatePairState.FROZEN) {
             state = RTCIceCandidatePairState.WAITING;
@@ -131,17 +143,17 @@ public class RTCIceCandidatePair implements RTCEventData {
         RTCIceRole role = trans.getRole();
         long reflexPri = priority(role);
         IceEngine ice = trans.iceGatherer.getIceEngine();
-        
+
         long tiebreaker = trans.getTieBreaker();
         final RTCIceCandidatePair pair = this;
-        
+
         String outboundUser = trans.getRemoteParameters().usernameFragment + ":" + trans.getLocalParameters().usernameFragment;
         IceStunBindingTransaction ret = new IceStunBindingTransaction(ice, host, port,
                 (int) reflexPri,
                 role,
                 tiebreaker,
                 outboundUser, nominate) {
-            
+
             @Override
             public StunPacket buildOutboundPacket() {
                 pair.sentOutbound();
@@ -154,20 +166,15 @@ public class RTCIceCandidatePair implements RTCEventData {
         ret.oncomplete = (RTCEventData data) -> {
             checkedOut = true;
             // well, this way works.
+            farIP = ret.getFar();
             Log.debug("got a reply to " + ret);
             if (checkedIn) {
                 // they have already sent us something...
                 this.setState(RTCIceCandidatePairState.SUCCEEDED);
             }
             if (nominate) {
-                try {
-                    Log.debug("nominating.... " + ret);
-                    farIP = ret.getFar();
-                    this.local.getChannel().connect(farIP);
-                    this.setState(RTCIceCandidatePairState.NOMINATED);
-                } catch (IOException ex) {
-                    Log.error("Can't connect " + this.toString());
-                }
+                Log.debug("nominating.... " + ret);
+                this.setState(RTCIceCandidatePairState.NOMINATED);
             }
         };
         return ret;
@@ -239,7 +246,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
             Log.debug("dumping dtls packet - no place to push it.");
         }
     }
-    
+
     public void pushRTP(DatagramPacket dgp) {
         if (onRTP != null) {
             RTCRtpPacket dat = new RTCRtpPacket();
@@ -250,7 +257,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
             Log.debug("dumping rtp packet - no place to push it.");
         }
     }
-    
+
     public void onRevoke() {
         if (onRevoke != null) {
             onRevoke.onEvent(null);
@@ -259,16 +266,21 @@ Each candidate pair in the check list has a foundation and a state. The foundati
             Log.debug("no one listening for onRevoke events");
         }
     }
-    
+
     void recvdInbound(StunBindingRequest sbr, RTCIceTransport transp, StunTransactionManager m) {
         checkedIn = true;
+        boolean farNominated = false;
         if (sbr.hasAttribute("USE-CANDIDATE")) {
             if (state == RTCIceCandidatePairState.SUCCEEDED) {
                 setState(RTCIceCandidatePairState.NOMINATED);
             }
+            farNominated = true;
         }
         if (!checkedOut) {
-            StunTransaction tr = trigger(transp);
+            if (state == RTCIceCandidatePairState.FROZEN) {
+                setState(RTCIceCandidatePairState.INPROGRESS);
+            }
+            StunTransaction tr = farNominated?triggerNominated(transp):trigger(transp);
             if (tr != null) {
                 m.addTransaction(tr);
             }
@@ -278,15 +290,15 @@ Each candidate pair in the check list has a foundation and a state. The foundati
             }
         }
     }
-    
+
     public boolean isNominateable() {
         return (state == RTCIceCandidatePairState.SUCCEEDED) && checkedIn && checkedOut;
     }
-    
+
     public InetSocketAddress getFarIp() {
         return farIP;
     }
-    
+
     public void sendTo(byte[] buf, int off, int len) throws IOException {
         if (state == RTCIceCandidatePairState.NOMINATED) {
             DatagramChannel ch = getLocal().getChannel();
@@ -298,7 +310,58 @@ Each candidate pair in the check list has a foundation and a state. The foundati
                 throw x;
             }
         } else {
-            Log.warn("cant send : "+name+" not selected.");
+            Log.warn("cant send : " + name + " not selected.");
+        }
+    }
+
+    public void sendStash() {
+        packetStash.forEach((byte[] pkt) -> {
+            try {
+                sendTo(pkt, 0, pkt.length);
+            } catch (IOException ex) {
+                Log.warn("error unstashing pkt");
+            }
+        });
+        packetStash.clear();
+    }
+
+    public void stashPacket(byte[] rec) {
+        packetStash.add(rec);
+    }
+
+    public boolean sameAsMe(DatagramChannel c, InetSocketAddress f) {
+        /*String err = "";
+        if (c == null) {
+            err += " C is null.";
+        }
+        if (f == null) {
+            err += " F is null.";
+        }
+        if (farIP == null) {
+            err += " FarIP is null.";
+        }
+        if (local == null) {
+            err += " Local is null. ";
+        } else {
+            DatagramChannel chan = local.getChannel();
+            if (chan == null) {
+                err += " Local.Chan is null";
+            }
+        }
+        if (err.length() > 0){
+            Log.warn(err);
+        }*/
+        return ((remote != null)
+                && (local != null)
+                && (c == this.getLocal().getChannel())
+                && this.remote.sameSocketAddress(f));
+    }
+
+    private void connectChannel() {
+        try {
+            this.local.getChannel().connect(farIP);
+        } catch (IOException ex) {
+            Log.error("Can't connect " + this.toString());
         }
     }
 }

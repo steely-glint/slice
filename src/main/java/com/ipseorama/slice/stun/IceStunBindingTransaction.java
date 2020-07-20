@@ -36,6 +36,9 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         this.tiebreaker = tiebreaker;
         this.outboundUser = outboundUser;
         this.nominate = nominate;
+        if (nominate){
+            this.dueTime = 0; // if this is a nomination we want it to jump the queue;
+        }
     }
 
 

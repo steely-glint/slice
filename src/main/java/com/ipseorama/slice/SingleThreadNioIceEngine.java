@@ -67,7 +67,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 switch (tstate) {
                     case COMPLETED:
                         selected = transP.getSelectedCandidatePair();
+                        _transM.pruneExcept(selected);
                         Log.debug("SELECTED ->> " + selected);
+                        selected.sendStash();
                         break;
                     case CONNECTED:
                         break;
@@ -124,7 +126,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
             packetRxTime = System.currentTimeMillis();
             while (_rcv != null) {
                 Long delay = tx();
-                if (Log.getLevel() >= Log.DEBUG) {
+                if (Log.getLevel() > Log.DEBUG) {
                     Log.debug("-----> candidate Pair States <------");
                     _transM.listPairs();
                 }
@@ -143,7 +145,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
         InetSocketAddress far = (InetSocketAddress) dgc.receive(recbuf);
         if (far == null) {
             // early return ----> 
-            Log.debug("Empty read far address");
+            Log.verb("Empty read far address");
             return false;
         }
         InetSocketAddress near = (InetSocketAddress) dgc.getLocalAddress();
@@ -176,8 +178,13 @@ public class SingleThreadNioIceEngine implements IceEngine {
             if (selected != null) {
                 selected.pushDTLS(rec, near, far);
             } else {
-                // strictly this is wrong - we should stack them...
-                Log.debug("dumping DTLS packet - no selected pair - yet...");
+                RTCIceCandidatePair pair = _transM.getTransport().findCandiatePair(dgc,far);
+                if (pair != null){
+                    pair.stashPacket(rec);
+                    Log.debug("stashed DTLS packet - no selected pair - yet...");
+                } else {
+                    Log.debug("No matching pair found ?!?!");
+                }
             }
         } else if (b < 0) {
             if (selected != null) {
@@ -255,24 +262,25 @@ public class SingleThreadNioIceEngine implements IceEngine {
         try {
             long now = System.currentTimeMillis();
             List<StunPacket> tos = null;
-            //synchronized (_trans) {
             tos = _transM.transact(now);
-            for (StunPacket sp : tos) {
-                if (sp != null) {
-                    byte o[] = sp.outboundBytes(miPass);
-                    DatagramChannel ch = sp.getChannel();
-                    InetSocketAddress far = sp.getFar();
-                    if (far != null) {
-                        Log.verb(StunPacket.hexString(sp.getTid()) + " sending packet type " + sp.getClass().getSimpleName() + " length " + o.length + "  to " + far);
-                        ByteBuffer src = ByteBuffer.wrap(o);
-                        ch.send(src, far);
-                    } else {
-                        Log.verb("not sending packet to unresolved address");
-                    }
+            if (tos != null) {
+                for (StunPacket sp : tos) {
+                    if (sp != null) {
+                        byte o[] = sp.outboundBytes(miPass);
+                        DatagramChannel ch = sp.getChannel();
+                        InetSocketAddress far = sp.getFar();
+                        if (far != null) {
+                            Log.verb(StunPacket.hexString(sp.getTid()) + " sending packet type " + sp.getClass().getSimpleName() + " length " + o.length + "  to " + far);
+                            ByteBuffer src = ByteBuffer.wrap(o);
+                            ch.send(src, far);
+                        } else {
+                            Log.verb("not sending packet to unresolved address");
+                        }
 
+                    }
                 }
             }
-            if ((tos == null) || tos.isEmpty()) {
+            if (((tos == null) || tos.isEmpty())&&(selected == null)) {
                 _transM.makeWork();
             }
         } catch (Exception x) {
@@ -293,7 +301,6 @@ public class SingleThreadNioIceEngine implements IceEngine {
     public StunTransactionManager getTransactionManager() {
         return this._transM;
     }
-
 
     public void stop() {
         _rcv = null;

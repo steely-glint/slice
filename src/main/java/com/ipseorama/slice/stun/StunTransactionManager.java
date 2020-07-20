@@ -27,6 +27,7 @@ public class StunTransactionManager {
     long NAPLEN = 1000;
     private RTCIceTransport transport;
     private Queue<StunTransaction> transactions;
+    Long nextDue = null;
 
     public StunTransactionManager() {
         transactions = new ConcurrentLinkedQueue();
@@ -34,6 +35,7 @@ public class StunTransactionManager {
 
     public void addTransaction(StunTransaction t) {
         transactions.add(t);
+        nextDue = null;
     }
 
     /*synchronized*/ StunTransaction get(byte[] tid) {
@@ -64,7 +66,7 @@ public class StunTransactionManager {
     }
 
     public void receivedPacket(StunPacket p, RTCIceProtocol prot, int ipv) {
-        Log.debug("recvd stun packet from " + p.getFar()+" id ="+StunPacket.hexString(p.getTid()));
+        Log.debug("recvd stun packet from " + p.getFar() + " id =" + StunPacket.hexString(p.getTid()));
         StunTransaction t = this.get(p.getTid());
         if (t != null) {
             t.receivedReply(p);
@@ -87,6 +89,7 @@ public class StunTransactionManager {
                 Log.verb("no matching transport");
             }
         }
+        nextDue = null; // situation has changed.
     }
 
     /*synchronized*/ public void removeComplete() {
@@ -125,20 +128,26 @@ public class StunTransactionManager {
                 ret = t.getDueTime();
             }
         }
+        nextDue = ret;
         return ret;
     }
 
-    /*synchronized*/ public List<StunPacket> transact(long now) {
-        List<StunPacket> pkts = transactions.stream()
-                .sorted((StunTransaction a, StunTransaction b) -> {
-                    return (int) (a.dueTime - b.dueTime);
-                })
-                .filter((StunTransaction t) -> {
-                    return (t != null) && !t.isComplete() && t.getDueTime() <= now;
-                }).map((StunTransaction t) -> {
-            Log.debug("Building packet for " + t.toString() + "due at " + t.dueTime);
-            return t.buildOutboundPacket();
-        }).collect(Collectors.toList());
+    public List<StunPacket> transact(long now) {
+        List<StunPacket> pkts = null;
+        if ((nextDue == null) || (nextDue < now)) {
+            pkts = transactions.stream()
+                    .sorted((StunTransaction a, StunTransaction b) -> {
+                        return (int) (a.dueTime - b.dueTime);
+                    })
+                    .filter((StunTransaction t) -> {
+                        return (t != null) && !t.isComplete() && t.getDueTime() <= now;
+                    }).map((StunTransaction t) -> {
+                Log.debug("Building packet for " + t.toString() + "due at " + t.dueTime);
+                return t.buildOutboundPacket();
+            }).collect(Collectors.toList());
+        } else {
+            Log.verb("Nothing doing....");
+        }
         return pkts;
     }
 
@@ -160,7 +169,6 @@ public class StunTransactionManager {
         return transactions.size();
     }
 
-
     public void pruneExcept(RTCIceCandidatePair sp) {
         Log.debug("Prune Transacts. to just " + sp);
         transactions.removeIf((StunTransaction sa) -> {
@@ -170,13 +178,14 @@ public class StunTransactionManager {
                     ret = false; // i.e. keep our pair
                     Log.debug("----> keep " + sa);
                 }
+                if (ret && !sa.isComplete()){
+                    ret = false; 
+                }
             }
             Log.debug("remove " + sa + " = " + ret);
             return ret;
         });
     }
-
-
 
     public void listPairs() {
         this.transport.listPairs();

@@ -47,7 +47,6 @@ public class RTCIceTransport {
     private final Comparator<RTCIceCandidatePair> ordering;
     private long tieBreaker;
     private StunTransactionManager transMan;
-    private InetSocketAddress dtlsTo;
     private IceEngine ice;
     
     public List<RTCIceCandidate> getRemoteCandidates() {
@@ -408,10 +407,8 @@ public class RTCIceTransport {
             if ((selectedPair == null) || (sel == null)) {
                 selectedPair = sel;
                 if (selectedPair != null){
+                    Log.debug("selected candiate pair now "+selectedPair.toString());
                     ret = true;
-                    
-                }else {
-                    dtlsTo = null;
                 }
                 if (oncandidatepairchange != null){
                     Log.debug("candiate pair changed");
@@ -459,5 +456,15 @@ public class RTCIceTransport {
                 }
                 break;
         }
+    }
+
+    public RTCIceCandidatePair findCandiatePair(DatagramChannel dgc, InetSocketAddress far) {
+        Optional<RTCIceCandidatePair> cp;
+        synchronized (candidatePairs) {
+             cp = candidatePairs.stream().filter((RTCIceCandidatePair icp) -> {
+                return icp.sameAsMe(dgc, far);
+            }).findAny();
+        }
+        return cp.orElse(null);
     }
 }
