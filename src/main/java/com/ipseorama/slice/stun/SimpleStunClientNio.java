@@ -42,10 +42,7 @@ public class SimpleStunClientNio extends StunBindingTransaction {
     private boolean unanswered = true;
     private StunTransactionManager stm;
     static IceEngine dummyEngine = new IceEngine() {
-        @Override
-        public void start(DatagramSocket ds, StunTransactionManager tm) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-        }
+
 
         @Override
         public void start(Selector ds, StunTransactionManager tm) {

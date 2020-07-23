@@ -85,4 +85,8 @@ public abstract class StunTransaction {
 
     public abstract DatagramChannel getChannel();
 
+    public void addDelay(int delay) {
+        dueTime += delay;
+    }
+
 }

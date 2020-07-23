@@ -422,8 +422,13 @@ public class RTCIceTransport {
         } else {
             Log.warn("duplicate pair selection");
         }
+        if (ret){
+            sel.futureConsentBindingTransaction(this,transMan);
+        }
         return ret;
     }
+    
+    
     
     public void disconnectedSelected() {
         Log.debug("IceTransport disconnected ...because no packets received on " + selectedPair == null ? "" : selectedPair.toString());

@@ -14,7 +14,6 @@ import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -310,8 +309,5 @@ public class SingleThreadNioIceEngine implements IceEngine {
         return mtu;
     }
 
-    @Override
-    public void start(DatagramSocket ds, StunTransactionManager tm) {
-        throw new UnsupportedOperationException("DatagramSockets Not supported anymore."); //To change body of generated methods, choose Tools | Templates.
-    }
+
 }

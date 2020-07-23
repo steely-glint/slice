@@ -330,6 +330,9 @@ public class StunPacket {
                             case 0x0001:
                                 ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity, near);
                                 break;
+                            case 0x0010:
+                                ret = new StunIndication(mtype, fingerprint, attributes,messageIntegrity, near);
+                                break;
                             default:
                                 ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity, near);
                                 break;

@@ -19,6 +19,7 @@ import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 
 /**
@@ -42,10 +43,12 @@ public class RTCIceCandidatePair implements RTCEventData {
     private boolean checkedOut = false;
     private InetSocketAddress farIP;
     private final ArrayList<byte[]> packetStash;
+    private SecureRandom rand;
 
     RTCIceCandidatePair(RTCLocalIceCandidate local, RTCIceCandidate remote) {
         this.local = local;
         this.remote = remote;
+        this.rand = new SecureRandom();
         this.name = "RTCIceCandidatePair-" + (COUNT++);
         packetStash = new ArrayList();
     }
@@ -363,5 +366,26 @@ Each candidate pair in the check list has a foundation and a state. The foundati
         } catch (IOException ex) {
             Log.error("Can't connect " + this.toString());
         }
+    }
+
+    
+    void futureConsentBindingTransaction(RTCIceTransport trans,StunTransactionManager transMan) {
+        if (this.state == state.NOMINATED){
+            StunTransaction ret = createAnOutBoundTransaction(trans, "outbound consent queued", false);
+            int delay = 1000 + rand.nextInt(1000);
+            ret.addDelay(delay);
+            Log.debug("Queued consent req for "+ret.getDueTime()+ " on " +this.name);
+            RTCIceCandidatePair pair = this;
+            ret.oncomplete = (RTCEventData data) -> {
+                Log.debug("Got consent reply, queue another on "+pair.name);
+                futureConsentBindingTransaction(trans,transMan);
+            };
+            ret.onerror = (RTCEventData data) -> {
+                Log.warn("Got consent revoked on "+pair.toString());
+                pair.setState(state.FAILED);
+            };
+            transMan.addTransaction(ret);
+        }
+        
     }
 }

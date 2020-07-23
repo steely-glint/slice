@@ -42,9 +42,6 @@ public class RTCIceGathererTest {
         public void start(Selector ds, StunTransactionManager tm) {
         }
 
-        @Override
-        public void start(DatagramSocket ds, StunTransactionManager tm) {
-        }
 
         @Override
         public boolean isStarted() {

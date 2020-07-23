@@ -50,10 +50,7 @@ public class IceStunBindingTransactionTest {
     public static void setUpClass() {
         Log.setLevel(Log.DEBUG);
         dummyIce = new IceEngine() {
-            @Override
-            public void start(DatagramSocket ds, StunTransactionManager tm) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
+
             
             @Override
             public void start(Selector ds, StunTransactionManager tm) {
