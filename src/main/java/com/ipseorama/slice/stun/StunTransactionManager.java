@@ -111,6 +111,8 @@ public class StunTransactionManager {
             };
             Log.debug("Adding outbound transaction \n\t" + transact.toString() + "\n\t for " + p);
             addTransaction(transact);
+        } else {
+            Log.debug("Nothing to check");
         }
     }
 

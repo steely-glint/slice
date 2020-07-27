@@ -189,7 +189,12 @@ public class RTCIceTransport {
     }
     
     public RTCIceCandidatePair nextCheck() {
-        return nextCheck(RTCIceCandidatePairState.WAITING);
+        RTCIceCandidatePair ret = nextCheck(RTCIceCandidatePairState.WAITING);
+        if (ret == null){
+            RTCIceCandidatePair defrost = nextCheck(RTCIceCandidatePairState.FROZEN);
+            defrost.setState(RTCIceCandidatePairState.WAITING);
+        }
+        return ret;
     }
     
     public RTCIceCandidatePair nextCheck(RTCIceCandidatePairState targetState) {

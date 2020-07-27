@@ -80,7 +80,7 @@ public abstract class StunTransaction {
         cause = c;
     }
     public String toString(){
-        return "{"+cause+"} stun Transaction type "+this.getClass().getSimpleName()+" complete="+this.isComplete()+ "tid ="+ StunPacket.hexString(id);
+        return "{"+cause+"} stun Transaction type "+this.getClass().getSimpleName()+" complete="+this.isComplete()+ " tid ="+ StunPacket.hexString(id)+" due at "+this.dueTime;
     }
 
     public abstract DatagramChannel getChannel();

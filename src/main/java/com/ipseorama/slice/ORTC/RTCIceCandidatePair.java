@@ -94,7 +94,6 @@ public class RTCIceCandidatePair implements RTCEventData {
         this.state = newState;
         if (this.state == state.NOMINATED) {
             connectChannel();
-
         }
         if (this.onStateChange != null) {
             onStateChange.onEvent(newState);

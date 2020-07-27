@@ -212,12 +212,13 @@ public class SingleThreadNioIceEngine implements IceEngine {
         if (nextTime != null) {
             delay = (int) (nextTime - now);
             if (delay < 0) {
-                delay = 0;
+                delay = Ta;
             }
             if (delay > POLL) {
                 delay = POLL;
             }
         }
+        Log.verb("delay is  =" + delay);
 
         try {
             int keys = _selector.select(delay);
