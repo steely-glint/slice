@@ -180,8 +180,9 @@ public class StunTransactionManager {
                     ret = false; // i.e. keep our pair
                     Log.debug("----> keep " + sa);
                 }
-                if (ret && !sa.isComplete()){
-                    ret = false; 
+                if (ret && !sa.isComplete()) {
+                    ret = false;
+                    Log.debug("----> keep " + sa);
                 }
             }
             Log.debug("remove " + sa + " = " + ret);
@@ -191,6 +192,16 @@ public class StunTransactionManager {
 
     public void listPairs() {
         this.transport.listPairs();
+    }
+
+    public boolean pairHasActiveTrans(RTCIceCandidatePair sp) {
+        return transactions.stream().anyMatch((StunTransaction sa) -> {
+            Log.debug("----> active check " + sa);
+            return (sa instanceof IceStunBindingTransaction)
+                    && ((((IceStunBindingTransaction) sa).getPair()) == sp)
+                    && !sa.isComplete();
+        });
+
     }
 
 }

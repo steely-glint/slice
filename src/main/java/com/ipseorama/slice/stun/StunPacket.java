@@ -5,6 +5,8 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.stun.StunPacketException.FingerPrintException;
+import com.ipseorama.slice.stun.StunPacketException.MessageIntegrityException;
 import com.phono.srtplight.Log;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -14,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.CRC32;
 import javax.crypto.Mac;
 import javax.crypto.ShortBufferException;
@@ -213,6 +216,15 @@ public class StunPacket {
                     Log.verb("found username in transaction " + username);
                 }
             }
+            if ((username == null) && (st == null)) {
+                Optional<String> v = miPass.keySet().stream().reduce((r, k) -> {
+                    return r + ":" + k;
+                });
+                if (v.isPresent()) {
+                    username = v.get();
+                    Log.debug("no transaction, so using the list we have to form username " + username);
+                }
+            }
             if (username != null) {
                 String[] susers = username.split(":");
                 int z = 0;
@@ -232,7 +244,7 @@ public class StunPacket {
                     });
                 }
             } else {
-                Log.debug("no username attribute in this packet or transaction" );
+                Log.debug("no username attribute in this packet or transaction");
             }
             if (pass != null) {
                 ret = pass.getBytes();
@@ -280,7 +292,7 @@ public class StunPacket {
     The idea of these static methods is basically paranoia - no stunpacket object is created untill
     the packet has passed validation checks. It also ensures we can create the correct type.
      */
-    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near, StunTransactionManager stm) throws Exception {
+    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near, StunTransactionManager stm) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException, StunPacketException  {
         StunPacket ret = null;
         if (inbound.length >= 20) {
             ByteBuffer b_frame = ByteBuffer.wrap(inbound);
@@ -309,14 +321,16 @@ public class StunPacket {
                                 messageIntegrity = calculateMessageIntegrity(pass, b_frame, fingerprint != null);
                             } else {
                                 if (Log.getLevel() >= Log.DEBUG) {
-                                    Log.debug("type = "+mtype);
-                                    Log.debug("Tid = "+hexString(tid));
-                                    if (attributes != null) {                                    
+                                    Log.debug("type = " + mtype);
+                                    Log.debug("Tid = " + hexString(tid));
+                                    if (attributes != null) {
                                         Log.debug("Attributes");
-                                        attributes.stream().forEach((StunAttribute a) -> {Log.debug("\t"+a.toString(tid));} );
+                                        attributes.stream().forEach((StunAttribute a) -> {
+                                            Log.debug("\t" + a.toString(tid));
+                                        });
                                     }
                                 }
-                                throw new MessageIntegrityException("No pass available...");
+                                throw new MessageIntegrityException("No pass available...",ret); 
                             }
                         }
                         validatePacket(attributes, fingerprint, messageIntegrity);
@@ -331,7 +345,7 @@ public class StunPacket {
                                 ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity, near);
                                 break;
                             case 0x0010:
-                                ret = new StunIndication(mtype, fingerprint, attributes,messageIntegrity, near);
+                                ret = new StunIndication(mtype, fingerprint, attributes, messageIntegrity, near);
                                 break;
                             default:
                                 ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity, near);
@@ -342,7 +356,7 @@ public class StunPacket {
                             ret.setPass(pass);
                         }
                     } else {
-                        throw new StunPacketException("implausible length param " + mlen + " not less than " + (inbound.length - 20));
+                        throw new StunPacketException("implausible length param " + mlen + " not less than " + (inbound.length - 20),ret);
                     }
                 } else {
                     throw new StunPacketException(" invalid stun cookie");
@@ -454,38 +468,12 @@ public class StunPacket {
     public void setChannel(DatagramChannel dgc) {
         this._channel = dgc;
     }
-    public DatagramChannel getChannel(){
+
+    public DatagramChannel getChannel() {
         return this._channel;
     }
 
-    static class FingerPrintException extends Exception {
 
-        public FingerPrintException() {
-            super();
-        }
-
-        public FingerPrintException(String cause) {
-            super(cause);
-        }
-    }
-
-    static class MessageIntegrityException extends Exception {
-
-        public MessageIntegrityException() {
-            super();
-        }
-
-        public MessageIntegrityException(String cause) {
-            super(cause);
-        }
-    }
-
-    static class StunPacketException extends Exception {
-
-        public StunPacketException(String message) {
-            super(message);
-        }
-    }
 
     public static String hexString(byte[] buf) {
         StringBuilder b = new StringBuilder();

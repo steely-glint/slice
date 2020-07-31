@@ -12,7 +12,6 @@ import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.phono.srtplight.Log;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.channels.DatagramChannel;
 
 /**
  *
@@ -32,6 +31,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     private int generation;
     private int ipVersion = 6;
     private int mtu;
+    static int num = 0;
 
     static RTCIceCandidate mkTempCandidate(InetSocketAddress isoc, RTCIceProtocol prot, int ipversion, long pri) {
         InetAddress home = isoc.getAddress();
@@ -64,6 +64,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
         this.type = type;
         this.tcpType = tcpType;
         this.generation = 0;
+        num++;
     }
 
     /**
@@ -213,7 +214,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     }
 
     public String toString() {
-        return this.toSDP(RTCIceComponent.RTP);
+        return "Candidate"+num+" "+this.toSDP(RTCIceComponent.RTP);
     }
     boolean sameEnoughIncludingWildCard(RTCIceCandidate cand) {
         boolean ret = false;
@@ -332,7 +333,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
             ret = ip.equalsIgnoreCase("0.0.0.0");
         }
         if (ipVersion == 6){
-            ret = ip.equalsIgnoreCase("::");
+            ret = ip.equalsIgnoreCase("::") ||ip.equalsIgnoreCase("0:0:0:0:0:0:0:0") ;
         }
         Log.verb(" wildcard "+ip+" = "+ret);
         return ret;

@@ -33,7 +33,7 @@ import java.util.Optional;
  * @author tim
  */
 public class RTCIceTransport {
-    
+
     static int MAXCHECKS = 100;
     RTCIceGatherer iceGatherer;
     RTCIceRole role;
@@ -43,25 +43,25 @@ public class RTCIceTransport {
     List<RTCIceCandidate> remoteCandidates;
     List<RTCIceCandidatePair> candidatePairs;
     RTCIceCandidatePair selectedPair;
-    
+
     private final Comparator<RTCIceCandidatePair> ordering;
     private long tieBreaker;
     private StunTransactionManager transMan;
     private IceEngine ice;
-    
+
     public List<RTCIceCandidate> getRemoteCandidates() {
         return remoteCandidates;
     }
-    
+
     public RTCIceCandidatePair getSelectedCandidatePair() {
         return selectedPair;
     }
-    
+
     public void start(RTCIceGatherer gatherer, RTCIceParameters remoteParameters, RTCIceRole role) {
         // for the moment we will ignore the new values and assume that the constructor was right....
         // and ignore the re-start semantics.
         ice = gatherer.getIceEngine();
-        
+
         this.transMan = gatherer.getStunTransactionManager();
         transMan.setTransport(this);
         final EventHandler oldAct = gatherer.onlocalcandidate;
@@ -81,24 +81,24 @@ public class RTCIceTransport {
                 oldAct.onEvent(c);
             }
         };
-        
+
     }
-    
+
     public void stop() {
     }
-    
+
     public RTCIceParameters getRemoteParameters() {
         return remoteParameters;
     }
-    
+
     public RTCIceParameters getLocalParameters() {
         return this.iceGatherer.getLocalParameters();
     }
-    
+
     RTCIceTransport createAssociatedTransport() {
         return null; // don't do this - rtcp-mux is good.
     }
-    
+
     public void addRemoteCandidate(RTCIceGatherCandidate remoteCandidate) {
         if (remoteCandidate instanceof RTCIceCandidate) {
             RTCIceCandidate r = (RTCIceCandidate) remoteCandidate;
@@ -113,17 +113,17 @@ public class RTCIceTransport {
             // assume end-of-candidates....
         }
     }
-    
+
     public void setRemoteCandidates(List<RTCIceCandidate> remoteCandidates) {
         // assumption is that this blatts the existing list - so we need to
         // compare and selectively add/delete - I suppose?!?
         // ignore for now.
         // assume all candidates are added vi addRemoteCandidate ;-)
     }
-    
+
     public EventHandler onstatechange;
     public EventHandler oncandidatepairchange;
-    
+
     public RTCIceTransport(RTCIceGatherer ig,
             RTCIceRole r,
             RTCIceComponent comp) {
@@ -156,7 +156,7 @@ public class RTCIceTransport {
             onstatechange.onEvent(newstate);
         }
     }
-    
+
     private RTCIceCandidatePair addPair(RTCLocalIceCandidate l, RTCIceCandidate r) {
         RTCIceCandidatePair ret = null;
         if (state == RTCIceTransportState.NEW) {
@@ -187,30 +187,33 @@ public class RTCIceTransport {
         }
         return ret;
     }
-    
+
     public RTCIceCandidatePair nextCheck() {
         RTCIceCandidatePair ret = nextCheck(RTCIceCandidatePairState.WAITING);
-        if (ret == null){
+        if (ret == null) {
             RTCIceCandidatePair defrost = nextCheck(RTCIceCandidatePairState.FROZEN);
-            defrost.setState(RTCIceCandidatePairState.WAITING);
+            if (defrost != null) {
+                defrost.setState(RTCIceCandidatePairState.WAITING);
+                ret = defrost;
+            }
         }
         return ret;
     }
-    
+
     public RTCIceCandidatePair nextCheck(RTCIceCandidatePairState targetState) {
         Optional<RTCIceCandidatePair> ret = null;
         synchronized (candidatePairs) {
             ret = candidatePairs.stream()
-                    .sorted(ordering)
-                    .limit(MAXCHECKS)
                     .filter((RTCIceCandidatePair icp) -> {
                         return icp.getState() == targetState;
                     })
+                    .limit(MAXCHECKS)
+                    .sorted(ordering)
                     .findFirst();
         }
         return ret.isPresent() ? ret.get() : null;
     }
-    
+
     private boolean checkRoleOk(StunBindingRequest sbr) {
         boolean ret = true;
         if (role == RTCIceRole.CONTROLLED) {
@@ -250,13 +253,13 @@ public class RTCIceTransport {
      */
     public List<StunTransaction> receivedNew(StunPacket p, RTCIceProtocol prot, int ipv) {
         List<StunTransaction> ret = null;
-        
+
         if (p instanceof StunBindingRequest) {
             // todo someone should check that the name/pass is right - who and how ?
             // check for required attributes.
 
             final StunBindingRequest sbr = (StunBindingRequest) p;
-            
+
             if (sbr.hasRequiredIceAttributes()) {
                 ret = new ArrayList();
                 if (sbr.isUser(iceGatherer.getLocalParameters().usernameFragment)) {
@@ -287,7 +290,7 @@ public class RTCIceTransport {
         }
         return ret;
     }
-    
+
     public RTCIceCandidatePair findMatchingPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
         /*InetSocketAddress near = p.getNear();
         InetSocketAddress far = p.getFar();*/
@@ -302,7 +305,7 @@ public class RTCIceTransport {
         }
         return cp.isPresent() ? cp.get() : null;
     }
-    
+
     private RTCIceCandidatePair mkPair(StunBindingRequest p, RTCIceProtocol prot, int ipv) {
         long pri = p.getPriority();
         DatagramChannel ch = p.getChannel();
@@ -321,7 +324,7 @@ public class RTCIceTransport {
         RTCLocalIceCandidate near = nopt.orElse(t_near);
         return addPair(near, far);
     }
-    
+
     RTCIceRole getRole() {
         return this.role;
     }
@@ -332,11 +335,11 @@ public class RTCIceTransport {
     public long getTieBreaker() {
         return tieBreaker;
     }
-    
+
     private List<RTCLocalIceCandidate> getLocalCandidates() {
         return this.iceGatherer.getLocalCandidates();
     }
-    
+
     public void triggerNominatablePair() {
         Optional<RTCIceCandidatePair> npair;
         if ((this.role == role.CONTROLLING)) {
@@ -357,20 +360,20 @@ public class RTCIceTransport {
             }
         }
     }
-    
+
     public RTCIceTransportState getState() {
         return this.state;
     }
-    
+
     public void sendDtlsPkt(byte[] buf, int off, int len) throws IOException {
-        Log.verb("Will send packet on " + selectedPair);        
+        Log.verb("Will send packet on " + selectedPair);
         if (selectedPair != null) {
             selectedPair.sendTo(buf, off, len);
         } else {
             throw new IOException("Null selected pair, can't send non ice packet yet");
         }
     }
-    
+
     public void onError(RTCEventData e) {
         Log.warn("triggered Rtans error");
         if ((e != null) && (e instanceof StunAttribute.ErrorAttribute)) {
@@ -383,12 +386,12 @@ public class RTCIceTransport {
             }
         }
     }
-    
+
     public int getMTU() {
         IceEngine ice = this.iceGatherer.getIceEngine();
         return ice.getMTU();
     }
-    
+
     public void pruneExcept(RTCIceCandidatePair sp) {
         if (sp != null) {
             transMan.pruneExcept(sp);
@@ -399,23 +402,23 @@ public class RTCIceTransport {
             Log.debug("pruned candidate Pairs to _just_ selected pair");
         }
     }
-    
+
     public void listPairs() {
         candidatePairs.forEach((p) -> {
             Log.debug(p.toString());
         });
     }
-    
+
     public boolean setSelected(RTCIceCandidatePair sel) {
         boolean ret = false;
         if (sel != selectedPair) {
             if ((selectedPair == null) || (sel == null)) {
                 selectedPair = sel;
-                if (selectedPair != null){
-                    Log.debug("selected candiate pair now "+selectedPair.toString());
+                if (selectedPair != null) {
+                    Log.debug("selected candiate pair now " + selectedPair.toString());
                     ret = true;
                 }
-                if (oncandidatepairchange != null){
+                if (oncandidatepairchange != null) {
                     Log.debug("candiate pair changed");
                     oncandidatepairchange.onEvent(sel);
                 } else {
@@ -427,21 +430,19 @@ public class RTCIceTransport {
         } else {
             Log.warn("duplicate pair selection");
         }
-        if (ret){
-            sel.futureConsentBindingTransaction(this,transMan);
+        if (ret) {
+            sel.futureConsentBindingTransaction(this, transMan);
         }
         return ret;
     }
-    
-    
-    
+
     public void disconnectedSelected() {
         Log.debug("IceTransport disconnected ...because no packets received on " + selectedPair == null ? "" : selectedPair.toString());
         this.setState(RTCIceTransportState.DISCONNECTED);
     }
-    
+
     private void pairChangedState(RTCIceCandidatePair p) {
-        
+
         RTCIceCandidatePairState pstate = p.getState();
         switch (pstate) {
             case SUCCEEDED:
@@ -471,7 +472,7 @@ public class RTCIceTransport {
     public RTCIceCandidatePair findCandiatePair(DatagramChannel dgc, InetSocketAddress far) {
         Optional<RTCIceCandidatePair> cp;
         synchronized (candidatePairs) {
-             cp = candidatePairs.stream().filter((RTCIceCandidatePair icp) -> {
+            cp = candidatePairs.stream().filter((RTCIceCandidatePair icp) -> {
                 return icp.sameAsMe(dgc, far);
             }).findAny();
         }

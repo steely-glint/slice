@@ -17,6 +17,7 @@ import com.phono.srtplight.Log;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.security.SecureRandom;
@@ -90,13 +91,17 @@ public class RTCIceCandidatePair implements RTCEventData {
     }
 
     public void setState(RTCIceCandidatePairState newState) {
-        Log.debug("CandidatePair " + name + " state " + state + " -> " + newState);
-        this.state = newState;
-        if (this.state == state.NOMINATED) {
-            connectChannel();
-        }
-        if (this.onStateChange != null) {
-            onStateChange.onEvent(newState);
+        if (this.state != newState) {
+            Log.debug("CandidatePair " + name + " state " + state + " -> " + newState);
+            this.state = newState;
+            if (this.state == state.NOMINATED) {
+                connectChannel();
+            }
+            if (this.onStateChange != null) {
+                onStateChange.onEvent(newState);
+            }
+        } else {
+            Log.debug("No change in CandidatePair " + name + " state " + state);
         }
     }
 
@@ -119,7 +124,7 @@ public class RTCIceCandidatePair implements RTCEventData {
         StunTransaction ret = createAnOutBoundTransaction(trans, "outbound check triggered by nomination", true);
         return ret;
     }
-    
+
     StunTransaction triggerNomination(RTCIceTransport trans) {
         StunTransaction ret = createAnOutBoundTransaction(trans, "outbound nomination triggered", true);
         return ret;
@@ -172,7 +177,9 @@ public class RTCIceCandidatePair implements RTCEventData {
             Log.debug("got a reply to " + ret);
             if (checkedIn) {
                 // they have already sent us something...
-                this.setState(RTCIceCandidatePairState.SUCCEEDED);
+                if (state == RTCIceCandidatePairState.INPROGRESS) {
+                    this.setState(RTCIceCandidatePairState.SUCCEEDED);
+                }
             }
             if (nominate) {
                 Log.debug("nominating.... " + ret);
@@ -282,7 +289,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
             if (state == RTCIceCandidatePairState.FROZEN) {
                 setState(RTCIceCandidatePairState.INPROGRESS);
             }
-            StunTransaction tr = farNominated?triggerNominated(transp):trigger(transp);
+            StunTransaction tr = farNominated ? triggerNominated(transp) : trigger(transp);
             if (tr != null) {
                 m.addTransaction(tr);
             }
@@ -361,30 +368,48 @@ Each candidate pair in the check list has a foundation and a state. The foundati
 
     private void connectChannel() {
         try {
-            this.local.getChannel().connect(farIP);
+            DatagramChannel ch = this.local.getChannel();
+            if (ch != null) {
+                if (!ch.isConnected()) {
+                    ch.connect(farIP);
+                } else {
+                    SocketAddress ofip = ch.getRemoteAddress();
+                    if (!ofip.equals(farIP)) {
+                        Log.warn("cant change connected address on" + this.name);
+                    } else {
+                        Log.warn("already connected " + this.name);
+                    }
+                }
+            } else {
+                Log.warn("No channel to connect on" + this.name);
+            }
         } catch (IOException ex) {
             Log.error("Can't connect " + this.toString());
         }
     }
 
-    
-    void futureConsentBindingTransaction(RTCIceTransport trans,StunTransactionManager transMan) {
-        if (this.state == state.NOMINATED){
-            StunTransaction ret = createAnOutBoundTransaction(trans, "outbound consent queued", false);
-            int delay = 1000 + rand.nextInt(1000);
-            ret.addDelay(delay);
-            Log.debug("Queued consent req for "+ret.getDueTime()+ " on " +this.name);
-            RTCIceCandidatePair pair = this;
-            ret.oncomplete = (RTCEventData data) -> {
-                Log.debug("Got consent reply, queue another on "+pair.name);
-                futureConsentBindingTransaction(trans,transMan);
-            };
-            ret.onerror = (RTCEventData data) -> {
-                Log.warn("Got consent revoked on "+pair.toString());
-                pair.setState(state.FAILED);
-            };
-            transMan.addTransaction(ret);
+    void futureConsentBindingTransaction(RTCIceTransport trans, StunTransactionManager transMan) {
+        if (this.state == state.NOMINATED) {
+            if (!transMan.pairHasActiveTrans(this)) {
+                StunTransaction ret = createAnOutBoundTransaction(trans, "outbound consent queued", false);
+                int delay = 1000 + rand.nextInt(1000);
+                ret.addDelay(delay);
+                Log.debug("Queued consent req for " + ret.getDueTime() + " on " + this.name);
+                RTCIceCandidatePair pair = this;
+                ret.oncomplete = (RTCEventData data) -> {
+                    Log.debug("Got consent reply, queue another on " + pair.name);
+                    futureConsentBindingTransaction(trans, transMan);
+                };
+                ret.onerror = (RTCEventData data) -> {
+                    Log.warn("Got consent revoked on " + pair.toString());
+                    pair.setState(state.FAILED);
+                };
+                transMan.addTransaction(ret);
+            } else {
+                Log.debug(name+" already has active transactions ");
+            }
+            transMan.removeComplete();
         }
-        
+
     }
 }

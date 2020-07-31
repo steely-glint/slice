@@ -5,6 +5,7 @@
  */
 package com.ipseorama.slice.stun;
 
+import com.ipseorama.slice.stun.StunPacketException.MessageIntegrityException;
 import com.phono.srtplight.Log;
 import java.net.InetSocketAddress;
 import java.util.AbstractMap.SimpleEntry;
@@ -238,7 +239,7 @@ public class StunPacketTest {
         } catch (Exception x) {
             rez = x;
         }
-        assert (rez instanceof StunPacket.MessageIntegrityException);
+        assert (rez instanceof MessageIntegrityException);
     }
 
     @Test

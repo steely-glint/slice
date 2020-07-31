@@ -8,22 +8,27 @@ package com.ipseorama.slice;
 import com.ipseorama.slice.ORTC.EventHandler;
 import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import com.ipseorama.slice.ORTC.RTCIceTransport;
+import com.ipseorama.slice.ORTC.RTCLocalIceCandidate;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
 import com.ipseorama.slice.stun.StunPacket;
+import com.ipseorama.slice.stun.StunPacketException;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -67,6 +72,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                     case COMPLETED:
                         selected = transP.getSelectedCandidatePair();
                         _transM.pruneExcept(selected);
+                        removeUnselectedChannels();
                         Log.debug("SELECTED ->> " + selected);
                         selected.sendStash();
                         break;
@@ -177,8 +183,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
             if (selected != null) {
                 selected.pushDTLS(rec, near, far);
             } else {
-                RTCIceCandidatePair pair = _transM.getTransport().findCandiatePair(dgc,far);
-                if (pair != null){
+                RTCIceCandidatePair pair = _transM.getTransport().findCandiatePair(dgc, far);
+                if (pair != null) {
                     pair.stashPacket(rec);
                     Log.debug("stashed DTLS packet - no selected pair - yet...");
                 } else {
@@ -211,16 +217,17 @@ public class SingleThreadNioIceEngine implements IceEngine {
 
         if (nextTime != null) {
             delay = (int) (nextTime - now);
-            if (delay < 0) {
+            if (delay <= 0) {
                 delay = Ta;
             }
             if (delay > POLL) {
                 delay = POLL;
             }
         }
-        Log.verb("delay is  =" + delay);
+        Log.debug("delay is  =" + delay);
 
         try {
+
             int keys = _selector.select(delay);
             Log.verb("Selection key count =" + keys);
             Set<SelectionKey> selectedKeys = _selector.selectedKeys();
@@ -229,8 +236,22 @@ public class SingleThreadNioIceEngine implements IceEngine {
 
                 SelectionKey key = iter.next();
                 while (key.isReadable() && key.isValid()) {
-                    if (!readPacket(key)) {
-                        break;
+                    try {
+                        if (!readPacket(key)) {
+                            break;
+                        }
+                    } catch (StunPacketException mex){
+                        // non fatal exception
+                        Log.warn("Weird Stun packet - ignoring it... "+mex.getClass().getCanonicalName()+" "+mex.getMessage());
+                        Log.debug("packet was "+mex.getPacket());
+                    } catch (Exception x) {
+                        // all other exceptions close the channel.
+                        Log.debug("Cancelling "+key.attachment()+" because "+x.toString());
+                        if (key.isValid()){
+                            key.cancel();
+                        }
+                        // to do - strictly we should tell the candidatePair that it has gone bad...
+                        throw(x); // see if there are any channels left to listen on.
                     }
                 }
                 iter.remove();
@@ -246,9 +267,16 @@ public class SingleThreadNioIceEngine implements IceEngine {
             }
 
         } catch (Exception x) {
-            if (!_selector.isOpen()) {
+            Optional<SelectionKey> valid = _selector.keys().stream().filter((SelectionKey key) -> {
+                Log.debug("channel attached to " + key.attachment());
+                return key.isValid() && (key.channel().isOpen());
+            }).findAny();
+            if (valid.isPresent()) {
+                Object att = valid.get().attachment();
+                Log.debug("Still have valid channel on " + att + " not giving up...");
+            } else {
                 _rcv = null;
-                Log.debug("Ice Selector closed quitting rcv loop");
+                Log.debug("Ice Selector out of valid channels,  quitting rcv loop");
             }
 
             if (Log.getLevel() >= Log.DEBUG) {
@@ -272,7 +300,11 @@ public class SingleThreadNioIceEngine implements IceEngine {
                         if (far != null) {
                             Log.verb(StunPacket.hexString(sp.getTid()) + " sending packet type " + sp.getClass().getSimpleName() + " length " + o.length + "  to " + far);
                             ByteBuffer src = ByteBuffer.wrap(o);
-                            ch.send(src, far);
+                            if (ch.isConnected()) {
+                                ch.write(src);
+                            } else {
+                                ch.send(src, far);
+                            }
                         } else {
                             Log.verb("not sending packet to unresolved address");
                         }
@@ -280,7 +312,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                     }
                 }
             }
-            if (((tos == null) || tos.isEmpty())&&(selected == null)) {
+            if (((tos == null) || tos.isEmpty()) && (selected == null)) {
                 _transM.makeWork();
             }
         } catch (Exception x) {
@@ -310,5 +342,23 @@ public class SingleThreadNioIceEngine implements IceEngine {
         return mtu;
     }
 
+    private void removeUnselectedChannels() {
+        // this isn't correct webRTC behaviour - but really accepting data on a
+        // unselected channels is a mistake.
+        DatagramChannel sc = selected.getLocal().getChannel();
+        Set<SelectionKey> keys = _selector.keys();
+        keys.forEach((key) -> {
+            SelectableChannel kc = key.channel();
+            if (kc != sc) {
+                Object pair = key.attachment();
+                if ((pair != null) && (pair instanceof RTCLocalIceCandidate)) {
+                    Log.debug("cancelling channel on " + pair.toString());
+                } else {
+                    Log.debug("cancelling " + kc.toString());
+                }
+                key.cancel();
+            }
+        });
+    }
 
 }
