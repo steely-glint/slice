@@ -131,6 +131,12 @@ public class StunAttribute {
         s.setString("|pipe| webRTC agent for IoT https://pi.pe");
         attrs.add(s);
     }
+    
+    static void addSoftware(ArrayList<StunAttribute> attrs,String debug) {
+        StunAttribute s = new StunAttribute("SOFTWARE");
+        s.setString("cause "+debug);
+        attrs.add(s);
+    }
 
     static void addUseCandidate(ArrayList<StunAttribute> attrs) {
         StunAttribute s = new StunAttribute("USE-CANDIDATE");

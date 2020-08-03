@@ -29,18 +29,17 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
             RTCIceRole role,
             long tiebreaker,
             String outboundUser,
-    boolean nominate) {
+            boolean nominate) {
         super(ice, host, port);
         this.reflexPri = reflexPri;
         this.role = role;
         this.tiebreaker = tiebreaker;
         this.outboundUser = outboundUser;
         this.nominate = nominate;
-        if (nominate){
+        if (nominate) {
             this.dueTime = 0; // if this is a nomination we want it to jump the queue;
         }
     }
-
 
     @Override
     public StunPacket buildOutboundPacket() {
@@ -51,14 +50,35 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         return bind;
     }
 
+    public StunPacket buildOutboundPacket(String cause) {
+        StunPacket bind = super.buildOutboundPacket();
+        if (bind != null) {
+            if ((Log.getLevel() >= Log.DEBUG)) {
+                populateAttributes(bind, cause);
+            } else {
+                populateAttributes(bind);
+            }
+        }
+        return bind;
+    }
+
     private void populateAttributes(StunPacket bind) {
+        populateAttributes(bind, null);
+    }
+
+    private void populateAttributes(StunPacket bind, String debug) {
 
         ArrayList<StunAttribute> attrs = new ArrayList();
         StunAttribute.addPriority(attrs, reflexPri);
         StunAttribute.addUsername(attrs, outboundUser);
-        StunAttribute.addSoftware(attrs);
+        if (debug != null) {
+            StunAttribute.addSoftware(attrs, debug);
+        } else {
+            StunAttribute.addSoftware(attrs);
+
+        }
         StunAttribute.addIceCon(attrs, role, tiebreaker);
-        if (nominate && role.equals(RTCIceRole.CONTROLLING)){
+        if (nominate && role.equals(RTCIceRole.CONTROLLING)) {
             StunAttribute.addUseCandidate(attrs);
         }
         StunAttribute.addMessageIntegrity(attrs);
@@ -71,9 +91,10 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
         return outboundUser;
     }
 
-    public boolean sentUseCandidate(){
+    public boolean sentUseCandidate() {
         return role.equals(RTCIceRole.CONTROLLING);
     }
+
     @Override
     public void receivedReply(StunPacket r) {
         if (r instanceof StunBindingResponse) {
@@ -86,19 +107,19 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
             } else {
                 Log.debug("Ignored incomplete response");
             }
-        } else if (r instanceof StunErrorResponse){
+        } else if (r instanceof StunErrorResponse) {
             StunErrorResponse error = (StunErrorResponse) r;
-            if (error.hasRequiredAttributes()){
+            if (error.hasRequiredAttributes()) {
                 StunAttribute ecodat = error.getAttributeByName("ERROR-CODE");
-                if (ecodat != null){
+                if (ecodat != null) {
                     StunAttribute.ErrorAttribute e = ecodat.getError();
-                    Log.warn("Error received "+e);
-                    if (e.code == 87){
+                    Log.warn("Error received " + e);
+                    if (e.code == 87) {
                         // role conflict
                         if (onerror != null) {
                             onerror.onEvent(e);
                         }
-                        if (role == role.CONTROLLING){
+                        if (role == role.CONTROLLING) {
                             role = role.CONTROLLED;
                         }
                     }
@@ -112,15 +133,17 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
     public void setPair(RTCIceCandidatePair pair) {
         candidatePair = pair;
     }
-    public RTCIceCandidatePair getPair(){
+
+    public RTCIceCandidatePair getPair() {
         return candidatePair;
     }
-    
-    public boolean nominationransaction(){
+
+    public boolean nominationransaction() {
         boolean ret = nominate;
-        if (inbound != null){
+        if (inbound != null) {
             ret = inbound.hasAttribute("USE-CANDIDATE");
         }
         return ret;
     }
+
 }

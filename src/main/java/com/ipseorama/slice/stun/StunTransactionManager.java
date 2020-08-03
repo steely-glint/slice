@@ -171,21 +171,23 @@ public class StunTransactionManager {
         return transactions.size();
     }
 
-    public void pruneExcept(RTCIceCandidatePair sp) {
+    public void pruneExcept(RTCIceCandidatePair sp, Long when) {
         Log.debug("Prune Transacts. to just " + sp);
         transactions.removeIf((StunTransaction sa) -> {
             boolean ret = true;
             if (sa instanceof IceStunBindingTransaction) {
-                if ((((IceStunBindingTransaction) sa).getPair()) == sp) {
-                    ret = false; // i.e. keep our pair
-                    Log.debug("----> keep " + sa);
-                }
-                if (ret && !sa.isComplete()) {
-                    ret = false;
-                    Log.debug("----> keep " + sa);
-                }
+                // things we want to remove
+                // 1) other pair
+                boolean others = (((IceStunBindingTransaction) sa).getPair()) != sp;
+                // 2) anything that's completed 
+                boolean complete = sa.isComplete();
+                // 3) anything old
+                boolean old = ((IceStunBindingTransaction) sa).dueTime < when;
+                ret = (others || complete || old);
+                Log.debug(ret ?"remove ":"keep "+sa.toString()+" ("+others+" "+complete+" "+old+")");
+            } else {
+                Log.debug("remove " + sa +" not ICE trans");
             }
-            Log.debug("remove " + sa + " = " + ret);
             return ret;
         });
     }

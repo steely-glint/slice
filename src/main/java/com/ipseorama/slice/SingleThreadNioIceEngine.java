@@ -71,7 +71,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 switch (tstate) {
                     case COMPLETED:
                         selected = transP.getSelectedCandidatePair();
-                        _transM.pruneExcept(selected);
+                        _transM.pruneExcept(selected, System.currentTimeMillis());
                         removeUnselectedChannels();
                         Log.debug("SELECTED ->> " + selected);
                         selected.sendStash();

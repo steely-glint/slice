@@ -139,9 +139,9 @@ public class RTCIceTransport {
             long lcp = p1.priority(role) - p2.priority(role);
             int ret = 0;
             if (lcp > 0) {
-                ret = 1;
-            } else if (lcp < 0) {
                 ret = -1;
+            } else if (lcp < 0) {
+                ret = 1;
             }
             return ret;
         };
@@ -392,16 +392,18 @@ public class RTCIceTransport {
         return ice.getMTU();
     }
 
+   /* 
     public void pruneExcept(RTCIceCandidatePair sp) {
         if (sp != null) {
             transMan.pruneExcept(sp);
-            /* instead of pruning the candidate pair list - we just make a new one with one entry :-) */
+            // instead of pruning the candidate pair list - we just make a new one with one entry :-)
             ArrayList<RTCIceCandidatePair> nsp = new ArrayList<RTCIceCandidatePair>();
             nsp.add(sp);
             candidatePairs = nsp;
             Log.debug("pruned candidate Pairs to _just_ selected pair");
         }
-    }
+    } 
+    */
 
     public void listPairs() {
         candidatePairs.forEach((p) -> {

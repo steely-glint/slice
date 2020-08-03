@@ -164,7 +164,7 @@ public class RTCIceCandidatePair implements RTCEventData {
             @Override
             public StunPacket buildOutboundPacket() {
                 pair.sentOutbound();
-                return super.buildOutboundPacket();
+                return super.buildOutboundPacket(cause);
             }
         };
         ret.setCause(cause);
