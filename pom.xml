@@ -5,11 +5,24 @@
     <artifactId>slice</artifactId>
     <version>1.0.92-NICE</version>
     <packaging>jar</packaging>
+    <repositories>
+        <repository>
+            <id>github</id>
+            <name>Srtplight</name>
+            <url>https://maven.pkg.github.com/steely-glint/srtplight</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
     <dependencies>
         <dependency>
             <groupId>com.phono</groupId>
             <artifactId>srtplight</artifactId>
-            <version>1.1.6</version>
+            <version>1.1.7</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

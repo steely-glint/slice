@@ -51,6 +51,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
     private Map<String, String> miPass = new HashMap();
     long nextAvailableTime;
     private RTCIceCandidatePair selected;
+    static int sliceid=0;
 
     public synchronized void start(Selector s, StunTransactionManager tm) {
         if (_started) {
@@ -95,7 +96,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
         Runnable ior = () -> {
             loop();
         };
-        _rcv = new Thread(ior, "nio-ice:");
+        _rcv = new Thread(ior, "nio-ice-"+sliceid+":");
+        sliceid++;
         _rcv.setPriority(Thread.MAX_PRIORITY);
         _rcv.start();
         _started = true;
