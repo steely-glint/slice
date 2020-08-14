@@ -27,14 +27,30 @@ public enum RTCIceGatherPolicy {
         public String toString() {
             return "relay";
         }
+    },
+    LOCAL() {
+        @Override
+        public String toString() {
+            return "local";
+        }
     };
-    public static RTCIceGatherPolicy fromString(String policy){
+
+    public static RTCIceGatherPolicy fromString(String policy) {
         RTCIceGatherPolicy ret = null;
         String p = policy.toLowerCase();
-        switch(p){
-            case "all": ret = ALL;break;
-            case "nohost": ret = NOHOST;break;
-            case "relay": ret = RELAY; break;
+        switch (p) {
+            case "all":
+                ret = ALL;
+                break;
+            case "nohost":
+                ret = NOHOST;
+                break;
+            case "relay":
+                ret = RELAY;
+                break;
+            case "local":
+                ret = LOCAL;
+                break;
         }
         return ret;
     }

@@ -1,4 +1,3 @@
-
 package com.ipseorama.slice.ORTC;
 
 import com.ipseorama.slice.stun.StunBindingTransaction;
@@ -172,7 +171,7 @@ For incoming connectivity checks that pass validation,
                                         RTCIceProtocol.UDP,
                                         (char) port,
                                         RTCIceCandidateType.HOST,
-                                        null,channel);
+                                        null, channel);
                                 cand6.setMTU(mtu);
 
                                 addLocalCandidate(cand6);
@@ -269,6 +268,10 @@ For incoming connectivity checks that pass validation,
             case RELAY:
                 gatherRelay(servers);
                 break;
+            case LOCAL:
+                gatherLocals();
+                break;
+
         }
     }
 
@@ -354,94 +357,94 @@ For incoming connectivity checks that pass validation,
 
     private void gatherReflex(List<RTCIceServer> servers) {
         try {
-        DatagramChannel reflexC = createDatagramChannel("0.0.0.0");
-        reflexC.register(_selector, SelectionKey.OP_READ);
-        servers.stream().forEach(
-                (RTCIceServer s) -> {
-                    Stream<String> stuns = s.urls.stream().map(
-                            (URI u) -> {
-                                String stun = "stun:";
-                                String us = u.toASCIIString();
-                                String hnp = null;
-                                Log.verb("checking uri " + us);
+            DatagramChannel reflexC = createDatagramChannel("0.0.0.0");
+            reflexC.register(_selector, SelectionKey.OP_READ);
+            servers.stream().forEach(
+                    (RTCIceServer s) -> {
+                        Stream<String> stuns = s.urls.stream().map(
+                                (URI u) -> {
+                                    String stun = "stun:";
+                                    String us = u.toASCIIString();
+                                    String hnp = null;
+                                    Log.verb("checking uri " + us);
 
-                                if (us.toLowerCase().startsWith(stun)) {
-                                    hnp = us.substring(stun.length());
-                                    Log.verb("stun host " + hnp);
-                                }
-                                return hnp;
-                            }
-                    ).filter((String host) -> {
-                        Log.verb("stunhost is " + host);
-                        return host != null;
-                    });
-                    stuns.forEach((String ss) -> {
-                        String bits[] = ss.split(":");
-                        String host = null;
-                        int port = 3478;
-                        if (bits.length == 2) {
-                            host = bits[0];
-                            port = Integer.parseInt(bits[1]);
-                        }
-                        if (bits.length == 1) {
-                            host = bits[0];
-                        }
-                        if (host != null) {
-                            StunBindingTransaction sbt = new StunBindingTransaction(_ice, host, port);
-                            sbt.setCause("outbound gather");
-                            sbt.setChannel(reflexC);
-
-                            sbt.oncomplete = (RTCEventData e) -> {
-                                Log.debug("got binding reply - or timeout");
-                                if (e instanceof RTCTimeoutEvent) {
-                                    Log.debug("got binding timeout");
-                                }
-                                if (e instanceof StunBindingTransaction) {
-
-                                    StunBindingTransaction st = (StunBindingTransaction) e;
-                                    InetSocketAddress ref = st.getReflex();
-
-                                    if (ref != null) {
-                                        RTCIceCandidateType type = RTCIceCandidateType.SRFLX;
-                                        RTCIceProtocol prot = RTCIceProtocol.UDP;
-                                        InetAddress raddr = reflexC.socket().getLocalAddress();
-                                        char rport = (char) reflexC.socket().getLocalPort();
-
-                                        String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
-                                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
-                                        RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
-                                                priority,
-                                                ref.getAddress().getHostAddress(),
-                                                prot,
-                                                (char) ref.getPort(),
-                                                type,
-                                                null,reflexC);
-                                        cand4.setRelatedAddress(raddr.getHostAddress());
-                                        cand4.setRelatedPort(rport);
-                                        if (ref.getAddress() instanceof java.net.Inet4Address) {
-                                            cand4.setIpVersion(4);
-                                        }
-                                        Optional<RTCLocalIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {
-                                            return l.getIpVersion() == cand4.getIpVersion();
-                                        }).findFirst();
-                                        lad.ifPresent((RTCIceCandidate l) -> {
-                                            cand4.setRelatedAddress(l.getIp());
-                                            cand4.setRelatedPort(l.getPort());
-                                        });
-                                        addLocalCandidate(cand4);
+                                    if (us.toLowerCase().startsWith(stun)) {
+                                        hnp = us.substring(stun.length());
+                                        Log.verb("stun host " + hnp);
                                     }
+                                    return hnp;
                                 }
-                                _stm.removeComplete();
-                                if (_stm.size() == 0) {
-                                    setState(RTCIceGathererState.COMPLETE);
-                                }
-                            };
-                            _stm.addTransaction(sbt);
-                        }
+                        ).filter((String host) -> {
+                            Log.verb("stunhost is " + host);
+                            return host != null;
+                        });
+                        stuns.forEach((String ss) -> {
+                            String bits[] = ss.split(":");
+                            String host = null;
+                            int port = 3478;
+                            if (bits.length == 2) {
+                                host = bits[0];
+                                port = Integer.parseInt(bits[1]);
+                            }
+                            if (bits.length == 1) {
+                                host = bits[0];
+                            }
+                            if (host != null) {
+                                StunBindingTransaction sbt = new StunBindingTransaction(_ice, host, port);
+                                sbt.setCause("outbound gather");
+                                sbt.setChannel(reflexC);
+
+                                sbt.oncomplete = (RTCEventData e) -> {
+                                    Log.debug("got binding reply - or timeout");
+                                    if (e instanceof RTCTimeoutEvent) {
+                                        Log.debug("got binding timeout");
+                                    }
+                                    if (e instanceof StunBindingTransaction) {
+
+                                        StunBindingTransaction st = (StunBindingTransaction) e;
+                                        InetSocketAddress ref = st.getReflex();
+
+                                        if (ref != null) {
+                                            RTCIceCandidateType type = RTCIceCandidateType.SRFLX;
+                                            RTCIceProtocol prot = RTCIceProtocol.UDP;
+                                            InetAddress raddr = reflexC.socket().getLocalAddress();
+                                            char rport = (char) reflexC.socket().getLocalPort();
+
+                                            String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
+                                            long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
+                                            RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
+                                                    priority,
+                                                    ref.getAddress().getHostAddress(),
+                                                    prot,
+                                                    (char) ref.getPort(),
+                                                    type,
+                                                    null, reflexC);
+                                            cand4.setRelatedAddress(raddr.getHostAddress());
+                                            cand4.setRelatedPort(rport);
+                                            if (ref.getAddress() instanceof java.net.Inet4Address) {
+                                                cand4.setIpVersion(4);
+                                            }
+                                            Optional<RTCLocalIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {
+                                                return l.getIpVersion() == cand4.getIpVersion();
+                                            }).findFirst();
+                                            lad.ifPresent((RTCIceCandidate l) -> {
+                                                cand4.setRelatedAddress(l.getIp());
+                                                cand4.setRelatedPort(l.getPort());
+                                            });
+                                            addLocalCandidate(cand4);
+                                        }
+                                    }
+                                    _stm.removeComplete();
+                                    if (_stm.size() == 0) {
+                                        setState(RTCIceGathererState.COMPLETE);
+                                    }
+                                };
+                                _stm.addTransaction(sbt);
+                            }
+                        });
                     });
-                });
-        } catch (IOException x){
-            
+        } catch (IOException x) {
+
         }
     }
 
@@ -472,7 +475,7 @@ For incoming connectivity checks that pass validation,
             int pno = portMin + rand.nextInt(rangeSz);
             try {
                 InetSocketAddress local = new InetSocketAddress(home, pno);
-                Log.verb("new local socket address "+local.toString());
+                Log.verb("new local socket address " + local.toString());
                 ret.bind(local);
                 ret.configureBlocking(false);
                 ret.socket().setTrafficClass(46);

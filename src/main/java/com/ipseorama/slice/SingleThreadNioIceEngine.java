@@ -15,7 +15,6 @@ import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunPacketException;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.net.SocketException;

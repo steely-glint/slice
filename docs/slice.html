@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Ice tester for Slice</title>
+
+</head>
+<body>
+<div> Run this is chrome with </div>
+<pre> --enable-blink-features=RTCIceTransportExtension</pre>
+<script type="text/javascript">
+
+    const iceOptions = {}; // STUN/TURN servers. Not used by this example.
+
+    // At the Sender side, create an ICE transport
+    const ice1 = new RTCIceTransport();
+    ice1.onstatechange = function() {
+        console.log('ICE transport state change', ice1.state);
+        document.getElementById('status').innerHTML = "Status : "+ ice1.state;
+    };
+    ice1.onicecandidate = function(evt) {
+        console.log('local candidate ', evt.candidate);
+    };
+
+    function canToString(can){
+        return can.type+" "+can.address+":"+can.port+" "+can.protocol;
+    }
+
+    ice1.onselectedcandidatepairchange = function(event) {
+        var pair = ice1.getSelectedCandidatePair();
+        console.log(' candidate pair', pair);
+        document.getElementById('local').innerHTML =  "local  : " +canToString(pair.local);
+        document.getElementById('remote').innerHTML = "remote : " +canToString(pair.remote);
+    };
+    function parseUri(u){
+        var ret = {};
+        // webrtc://w1howw20rztc:u25idcns7npb3fjuhmjeqt7nh@192.67.4.33:28423/
+        if (u.indexOf("webrtc://")== 0){
+            var tailpath = u.substr(9);
+            var paths = tailpath.split("/");
+            var tail = paths[0];
+            var ib = tail.split("@");
+            var frag = ib[0];
+            var addr = ib[1];
+            var frags = frag.split(":");
+            ret.username = frags[0];
+            ret.password = frags[1];
+            var addrs = addr.split(":");
+            ret.host = addrs[0];
+            ret.port = addrs[1];
+            if (paths.size == 2){
+                ret.dclabel = paths[1];
+            }
+        }
+        return ret;
+    }
+
+    function startIce(){
+        var uri = document.getElementById("uri").value;
+        // expecting something that looks like:
+        var p = parseUri(uri);
+        var iceparas = {password: p.password, usernameFragment: p.username};
+        ice1.start(iceparas, 'controlling');
+        ice1.gather(iceOptions);
+        var c = "candidate:945487496 0 udp 2113939712 "+p.host+" "+p.port+" typ host generation 0 ufrag "+p.username;
+        console.log("c is "+c);
+        var rtc = new RTCIceCandidate({sdpMid:"",sdpMidLineIndex:0,candidate:c,usernameFragment:p.username});
+        ice1.addRemoteCandidate(rtc);
+    }
+</script>
+Put webrtc:// uri here
+<input type="text" id="uri"/>
+<button onclick="startIce();">Start</button>
+<br/>
+<div id="status"></div>
+<div id="local"></div>
+<div id="remote"></div>
+</body>
+</html>
