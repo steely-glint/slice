@@ -112,7 +112,7 @@ public class Slice {
         Log.setLevel(Log.INFO);
         Log.info("To test open chrome with the magic flag:");
         Log.info("--enable-blink-features=RTCIceTransportExtension");
-        Log.info("Browse to https://steely-glint.github.io/slice/");
+        Log.info("Browse to https://steely-glint.github.io/slice/slice.html");
         new Slice();
     }
 
