@@ -2,4 +2,7 @@ Lightweight Java 8 minimal STUN/TURN/Ice stack for webRTC
 The goal is to provide infrastructure for data channel set up on massive server-side
 systems. Also suitable for IoT endpoints due to minimal thread use.
 Aims to Support Direct UDP and TURN TLS Only.
-Losely based on an abortive attempt to do ICE in scala/akka actors.
+(Currently only STUN and HOST - TURN later...)
+Loosely based on ORTC ICETransport API
+
+com.ipseorama.slice.Slice is a minimal demo program.
