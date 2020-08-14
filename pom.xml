@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.ipseorama</groupId>
     <artifactId>slice</artifactId>
-    <version>1.0.92-NICE</version>
+    <version>1.0.92-NICEGIT</version>
     <packaging>jar</packaging>
     <repositories>
         <repository>
@@ -48,6 +48,13 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/steely-glint/slice</url>
+        </repository>
+    </distributionManagement>
     <build>
         <plugins>
             <plugin>
