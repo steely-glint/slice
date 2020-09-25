@@ -72,9 +72,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
                     case COMPLETED:
                         selected = transP.getSelectedCandidatePair();
                         _transM.pruneExcept(selected, System.currentTimeMillis());
-                        removeUnselectedChannels();
+                        removeUnselectedChannels(); // that's not really RFC 
                         Log.debug("SELECTED ->> " + selected);
-                        selected.sendStash();
+                        selected.pushDTLSStash();
                         break;
                     case CONNECTED:
                         break;
@@ -182,7 +182,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
         } else if ((19 < b) && (b < 64)) {
             Log.debug("push inbound DTLS packet");
             if (selected != null) {
-                selected.pushDTLS(rec, near, far);
+                selected.pushDTLS(rec);
             } else {
                 RTCIceCandidatePair pair = _transM.getTransport().findCandiatePair(dgc, far);
                 if (pair != null) {
@@ -190,6 +190,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
                     Log.debug("stashed DTLS packet - no selected pair - yet...");
                 } else {
                     Log.debug("No matching pair found ?!?!");
+                    Log.debug("DTLS came in on channel "+dgc.toString()+" far "+far);
+                    _transM.getTransport().listPairs();
                 }
             }
         } else if (b < 0) {
@@ -225,7 +227,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 delay = POLL;
             }
         }
-        Log.debug("delay is  =" + delay);
+        if (this.selected == null){
+            Log.debug("delay is  =" + delay);
+        }
 
         try {
 
@@ -245,12 +249,15 @@ public class SingleThreadNioIceEngine implements IceEngine {
                         // non fatal exception
                         Log.warn("Weird Stun packet - ignoring it... "+mex.getClass().getCanonicalName()+" "+mex.getMessage());
                         Log.debug("packet was "+mex.getPacket());
-                    } catch (Exception x) {
+                    } catch (java.net.PortUnreachableException pox){
+                        Log.warn("Port unreachable exception on "+key.attachment()+" message "+pox.getMessage());
+                    }catch (Exception x) {
                         // all other exceptions close the channel.
-                        Log.debug("Cancelling "+key.attachment()+" because "+x.toString());
-                        if (key.isValid()){
-                            key.cancel();
-                        }
+                        //Log.debug("Cancelling "+key.attachment()+" because "+x.toString());
+                        //if (key.isValid()){
+                        //    key.cancel();
+                        //}
+                        Log.warn("Exception "+x+" on packet recv. Not closing dgc ");
                         // to do - strictly we should tell the candidatePair that it has gone bad...
                         throw(x); // see if there are any channels left to listen on.
                     }
@@ -309,7 +316,6 @@ public class SingleThreadNioIceEngine implements IceEngine {
                         } else {
                             Log.verb("not sending packet to unresolved address");
                         }
-
                     }
                 }
             }
@@ -317,8 +323,11 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 _transM.makeWork();
             }
         } catch (Exception x) {
-            Log.error("Exception in tx" + x.getMessage());
-            x.printStackTrace();
+            Log.error("Exception in tx " + x);
+            StackTraceElement[] trace = x.getStackTrace();
+            for (StackTraceElement el:trace){
+                Log.warn("\n\t "+el.toString());
+            }
         }
         long nextTime = _transM.nextDue();
         Log.verb("not removing complete ICE stun transactions for now... ");
@@ -351,13 +360,15 @@ public class SingleThreadNioIceEngine implements IceEngine {
         keys.forEach((key) -> {
             SelectableChannel kc = key.channel();
             if (kc != sc) {
-                Object pair = key.attachment();
-                if ((pair != null) && (pair instanceof RTCLocalIceCandidate)) {
-                    Log.debug("cancelling channel on " + pair.toString());
+                Object cand = key.attachment();
+                if ((cand != null) && (cand instanceof RTCLocalIceCandidate)) {
+                    Log.debug("cancelling channel on " + cand.toString());
                 } else {
                     Log.debug("cancelling " + kc.toString());
                 }
                 key.cancel();
+            } else {
+                Log.debug("keeping selected channel "+kc );
             }
         });
     }

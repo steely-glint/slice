@@ -319,7 +319,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
     }
 
     boolean sameSocketAddress(InetSocketAddress sa) {
-        boolean ret = this.getIp().equals(sa.getAddress()) && this.getPort() == sa.getPort();
+        boolean ret = this.getIp().equals(sa.getAddress().getHostAddress()) && this.getPort() == sa.getPort();
         return ret;
     }
 

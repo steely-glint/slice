@@ -106,7 +106,8 @@ public class RTCIceCandidatePair implements RTCEventData {
     }
 
     public String toString() {
-        return name + " (" + this.state.toString().toUpperCase() + " )\n\tlocal :" + local.toString() + "\n\tremote :" + remote.toString();
+        return name + " (" + this.state.toString().toUpperCase() + " )\n\tlocal :" + local.toString() + "\n\tremote :" + remote.toString()
+                + "\n\t dgc : " + this.local.getChannel();
     }
 
     boolean sameEnough(RTCIceCandidate t_near, RTCIceCandidate t_far) {
@@ -174,6 +175,7 @@ public class RTCIceCandidatePair implements RTCEventData {
             checkedOut = true;
             // well, this way works.
             farIP = ret.getFar();
+            
             Log.debug("got a reply to " + ret);
             if (checkedIn) {
                 // they have already sent us something...
@@ -244,10 +246,8 @@ Each candidate pair in the check list has a foundation and a state. The foundati
 
 
      */
-// TODO - unconvinced this is the right place for these.
-    public void pushDTLS(byte[] rec, InetSocketAddress near, InetSocketAddress far) {
+    public void pushDTLS(byte[] rec) {
         if (onDtls != null) {
-            //if (getLocal().sameSocketAddress(near) && getRemote().sameSocketAddress(far)){
             RTCDtlsPacket dat = new RTCDtlsPacket();
             dat.data = rec;
             onDtls.onEvent(dat);
@@ -293,10 +293,8 @@ Each candidate pair in the check list has a foundation and a state. The foundati
             if (tr != null) {
                 m.addTransaction(tr);
             }
-        } else {
-            if (state == RTCIceCandidatePairState.INPROGRESS) {
-                setState(RTCIceCandidatePairState.SUCCEEDED);
-            }
+        } else if (state == RTCIceCandidatePairState.INPROGRESS) {
+            setState(RTCIceCandidatePairState.SUCCEEDED);
         }
     }
 
@@ -323,13 +321,9 @@ Each candidate pair in the check list has a foundation and a state. The foundati
         }
     }
 
-    public void sendStash() {
+    public void pushDTLSStash() {
         packetStash.forEach((byte[] pkt) -> {
-            try {
-                sendTo(pkt, 0, pkt.length);
-            } catch (IOException ex) {
-                Log.warn("error unstashing pkt");
-            }
+            this.pushDTLS(pkt);
         });
         packetStash.clear();
     }
@@ -360,6 +354,17 @@ Each candidate pair in the check list has a foundation and a state. The foundati
         if (err.length() > 0){
             Log.warn(err);
         }*/
+        if ((local == null) || (remote == null)) {
+            Log.warn(name + " pair has < 2 candidates ");
+        }
+        DatagramChannel chan = this.getLocal().getChannel();
+        if (chan != c) {
+            Log.debug(name + " channel doesn't match");
+        }
+        boolean samesock = this.remote.sameSocketAddress(f);
+        if (!samesock) {
+            Log.debug(name + " far " + f + " != " + remote.getIp() + ":" + remote.getPort());
+        }
         return ((remote != null)
                 && (local != null)
                 && (c == this.getLocal().getChannel())
@@ -367,6 +372,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
     }
 
     private void connectChannel() {
+        //Log.warn("NOT connecting channel to "+farIP+". Channel will use sendTo ");
         try {
             DatagramChannel ch = this.local.getChannel();
             if (ch != null) {
@@ -406,7 +412,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
                 };
                 transMan.addTransaction(ret);
             } else {
-                Log.debug(name+" already has active transactions ");
+                Log.debug(name + " already has active transactions ");
             }
             transMan.removeComplete();
         }

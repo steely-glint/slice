@@ -17,6 +17,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.URI;
 import java.nio.channels.DatagramChannel;
@@ -112,107 +113,105 @@ For incoming connectivity checks that pass validation,
                 Log.debug("Adding interface: " + ni.getDisplayName());
                 if (ni.isLoopback()) {
                     Log.debug("Skipping loopback " + ni.getDisplayName());
-                } else {
-                    if (ni.isUp()) {
-                        mtu = ni.getMTU();
-                        Enumeration ipads = ni.getInetAddresses();
-                        List<InterfaceAddress> iads = ni.getInterfaceAddresses();
-                        Inet4Address home = null;
-                        Inet6Address home6 = null;
-                        while (ipads.hasMoreElements()) {
-                            InetAddress ipad = (InetAddress) ipads.nextElement();
-                            if (!ipad.isLoopbackAddress()) {
-                                if (ipad instanceof Inet4Address) {
-                                    if (home == null) {
-                                        home = (Inet4Address) ipad;
-                                        Log.debug("Using address: " + ipad.getHostAddress());
-                                    } else {
-                                        Log.debug("Not Using address: " + ipad.getHostAddress());
-                                    }
-                                }
-                                if (ipad instanceof Inet6Address) {
-                                    if (ipad.isLinkLocalAddress()) {
-                                        Log.debug("Not Using link local address: " + ipad.getHostAddress());
-                                        continue;
-                                    }
-                                    if (home6 == null) {
-                                        home6 = (Inet6Address) ipad;
-                                        Log.debug("Using address (for now) : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                    } else if (howMacBased(home6.getAddress(), hw) > howMacBased(ipad.getAddress(), hw)) {
-                                        home6 = (Inet6Address) ipad;
-                                        Log.debug("Prefer using address : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                    } else {
-                                        Log.debug("Don't prefer Using address: " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                    }
-
+                } else if (ni.isUp()) {
+                    mtu = ni.getMTU();
+                    Enumeration ipads = ni.getInetAddresses();
+                    List<InterfaceAddress> iads = ni.getInterfaceAddresses();
+                    Inet4Address home = null;
+                    Inet6Address home6 = null;
+                    while (ipads.hasMoreElements()) {
+                        InetAddress ipad = (InetAddress) ipads.nextElement();
+                        if (!ipad.isLoopbackAddress()) {
+                            if (ipad instanceof Inet4Address) {
+                                if (home == null) {
+                                    home = (Inet4Address) ipad;
+                                    Log.debug("Using address: " + ipad.getHostAddress());
+                                } else {
+                                    Log.debug("Not Using address: " + ipad.getHostAddress());
                                 }
                             }
-                        }
-                        localAdd.append("\t\t" + ni.getDisplayName() + " ");
-                        if (home6 != null) {
+                            if (ipad instanceof Inet6Address) {
+                                if (ipad.isLinkLocalAddress()) {
+                                    Log.debug("Not Using link local address: " + ipad.getHostAddress());
+                                    continue;
+                                }
+                                if (home6 == null) {
+                                    home6 = (Inet6Address) ipad;
+                                    Log.debug("Using address (for now) : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                } else if (howMacBased(home6.getAddress(), hw) > howMacBased(ipad.getAddress(), hw)) {
+                                    home6 = (Inet6Address) ipad;
+                                    Log.debug("Prefer using address : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                } else {
+                                    Log.debug("Don't prefer Using address: " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                }
 
-                            localAdd.append(" [" + home6.getHostAddress() + "]");
-                            String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home6, null, RTCIceProtocol.UDP);
-                            long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
-                            lpref -= 6;
-                            String sixad = home6.getHostAddress();
-                            Log.debug("os sixad is " + sixad);
-                            if (sixad.contains("%")) {
-                                String bits[] = sixad.split("%");
-                                sixad = bits[0];
-                                Log.debug("new sixad is " + sixad);
-                            }
-                            try {
-                                DatagramChannel channel = createDatagramChannel(sixad);
-                                int port = channel.socket().getLocalPort();
-                                RTCLocalIceCandidate cand6 = new RTCLocalIceCandidate(foundation,
-                                        priority,
-                                        sixad,
-                                        RTCIceProtocol.UDP,
-                                        (char) port,
-                                        RTCIceCandidateType.HOST,
-                                        null, channel);
-                                cand6.setMTU(mtu);
-
-                                addLocalCandidate(cand6);
-
-                                channel.register(_selector, SelectionKey.OP_READ, (Object) cand6);
-                            } catch (IOException x) {
-                                Log.error("Candidate creation failed for " + home6);
-                            }
-
-                        }
-                        if (home != null) {
-                            String fourad = home.getHostAddress();
-                            try {
-                                DatagramChannel channel = createDatagramChannel(fourad);
-                                localAdd.append(fourad).append('\n');
-                                String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
-                                long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
-                                lpref -= 4;
-                                int port = channel.socket().getLocalPort();
-
-                                RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
-                                        priority,
-                                        fourad,
-                                        RTCIceProtocol.UDP,
-                                        (char) port,
-                                        RTCIceCandidateType.HOST,
-                                        null,
-                                        channel);
-                                cand4.setIpVersion(4);
-                                cand4.setMTU(mtu);
-
-                                addLocalCandidate(cand4);
-                                channel.register(_selector, SelectionKey.OP_READ, (Object) cand4);
-                            } catch (IOException x) {
-                                Log.error("Candidate creation failed for " + fourad);
                             }
                         }
-
-                    } else {
-                        Log.debug("Ignoring interface: " + ni.getDisplayName());
                     }
+                    localAdd.append("\t\t" + ni.getDisplayName() + " ");
+                    if (home6 != null) {
+
+                        localAdd.append(" [" + home6.getHostAddress() + "]");
+                        String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home6, null, RTCIceProtocol.UDP);
+                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
+                        lpref -= 6;
+                        String sixad = home6.getHostAddress();
+                        Log.debug("os sixad is " + sixad);
+                        if (sixad.contains("%")) {
+                            String bits[] = sixad.split("%");
+                            sixad = bits[0];
+                            Log.debug("new sixad is " + sixad);
+                        }
+                        try {
+                            DatagramChannel channel = createDatagramChannel(sixad);
+                            int port = channel.socket().getLocalPort();
+                            RTCLocalIceCandidate cand6 = new RTCLocalIceCandidate(foundation,
+                                    priority,
+                                    sixad,
+                                    RTCIceProtocol.UDP,
+                                    (char) port,
+                                    RTCIceCandidateType.HOST,
+                                    null, channel);
+                            cand6.setMTU(mtu);
+
+                            addLocalCandidate(cand6);
+
+                            channel.register(_selector, SelectionKey.OP_READ, (Object) cand6);
+                        } catch (IOException x) {
+                            Log.error("Candidate creation failed for " + home6);
+                        }
+
+                    }
+                    if (home != null) {
+                        String fourad = home.getHostAddress();
+                        try {
+                            DatagramChannel channel = createDatagramChannel(fourad);
+                            localAdd.append(fourad).append('\n');
+                            String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
+                            long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
+                            lpref -= 4;
+                            int port = channel.socket().getLocalPort();
+
+                            RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
+                                    priority,
+                                    fourad,
+                                    RTCIceProtocol.UDP,
+                                    (char) port,
+                                    RTCIceCandidateType.HOST,
+                                    null,
+                                    channel);
+                            cand4.setIpVersion(4);
+                            cand4.setMTU(mtu);
+
+                            addLocalCandidate(cand4);
+                            channel.register(_selector, SelectionKey.OP_READ, (Object) cand4);
+                        } catch (IOException x) {
+                            Log.error("Candidate creation failed for " + fourad);
+                        }
+                    }
+
+                } else {
+                    Log.debug("Ignoring interface: " + ni.getDisplayName());
                 }
             }
         } catch (SocketException x) {
@@ -337,7 +336,7 @@ For incoming connectivity checks that pass validation,
         return ret;
     }
     // allocate an unused port from the acceptable range
-
+/*
     private DatagramSocket allocateUdpSocket(int portMin, int portMax) {
         DatagramSocket ret = null;
         SecureRandom rand = new SecureRandom();
@@ -354,11 +353,27 @@ For incoming connectivity checks that pass validation,
         }
         return ret;
     }
+     */
+    DatagramChannel getChannelForReflex() throws IOException {
+        DatagramChannel ret = null;
+        Optional<RTCLocalIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {
+            return l.getIpVersion() == 4;
+        }).findFirst();
+        if (lad.isPresent()) {
+            ret = lad.get().getChannel();
+            Log.debug("reusing local candidate channel for STUN");
+        }
+        if (ret == null) {
+            ret = createDatagramChannel("0.0.0.0");
+            ret.register(_selector, SelectionKey.OP_READ);
+            Log.debug("had to create new channel for STUN");
+        }
+        return ret;
+    }
 
     private void gatherReflex(List<RTCIceServer> servers) {
         try {
-            DatagramChannel reflexC = createDatagramChannel("0.0.0.0");
-            reflexC.register(_selector, SelectionKey.OP_READ);
+            DatagramChannel reflexC = getChannelForReflex();
             servers.stream().forEach(
                     (RTCIceServer s) -> {
                         Stream<String> stuns = s.urls.stream().map(
@@ -412,26 +427,26 @@ For incoming connectivity checks that pass validation,
 
                                             String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
                                             long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
-                                            RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
+                                            RTCLocalIceCandidate rcand = new RTCLocalIceCandidate(foundation,
                                                     priority,
                                                     ref.getAddress().getHostAddress(),
                                                     prot,
                                                     (char) ref.getPort(),
                                                     type,
                                                     null, reflexC);
-                                            cand4.setRelatedAddress(raddr.getHostAddress());
-                                            cand4.setRelatedPort(rport);
+                                            rcand.setRelatedAddress(raddr.getHostAddress());
+                                            rcand.setRelatedPort(rport);
                                             if (ref.getAddress() instanceof java.net.Inet4Address) {
-                                                cand4.setIpVersion(4);
+                                                rcand.setIpVersion(4);
                                             }
-                                            Optional<RTCLocalIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {
-                                                return l.getIpVersion() == cand4.getIpVersion();
-                                            }).findFirst();
-                                            lad.ifPresent((RTCIceCandidate l) -> {
-                                                cand4.setRelatedAddress(l.getIp());
-                                                cand4.setRelatedPort(l.getPort());
-                                            });
-                                            addLocalCandidate(cand4);
+                                            try {
+                                                InetSocketAddress l = (InetSocketAddress) reflexC.getLocalAddress();
+                                                rcand.setRelatedAddress(l.getAddress().getHostAddress());
+                                                rcand.setRelatedPort((char) l.getPort());
+                                            } catch (IOException x) {
+                                                Log.warn("reflex candidate without rhost/rport " + x.getMessage());
+                                            }
+                                            addLocalCandidate(rcand);
                                         }
                                     }
                                     _stm.removeComplete();
@@ -475,7 +490,7 @@ For incoming connectivity checks that pass validation,
             int pno = portMin + rand.nextInt(rangeSz);
             try {
                 InetSocketAddress local = new InetSocketAddress(home, pno);
-                Log.verb("new local socket address " + local.toString());
+                Log.debug("new local socket address " + local.toString());
                 ret.bind(local);
                 ret.configureBlocking(false);
                 ret.socket().setTrafficClass(46);

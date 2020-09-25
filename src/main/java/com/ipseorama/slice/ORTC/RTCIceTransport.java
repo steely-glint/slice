@@ -162,28 +162,32 @@ public class RTCIceTransport {
         if (state == RTCIceTransportState.NEW) {
             setState(RTCIceTransportState.CHECKING);
         }
-        if (l.getProtocol() == r.getProtocol() && l.getIpVersion() == r.getIpVersion()) {
-            synchronized (candidatePairs) {
-                boolean present = candidatePairs.stream().anyMatch((RTCIceCandidatePair p) -> {
-                    return (l.sameFoundation(p.getLocal()) && r.sameFoundation(p.getRemote()));
-                });
-                if (!present) {
-                    RTCIceCandidatePair p = new RTCIceCandidatePair(l, r);
-                    if (p != null) {
-                        p.setState(RTCIceCandidatePairState.FROZEN);
-                        ret = p;
-                        candidatePairs.add(p);
-                        p.onStateChange = (data) -> {
-                            this.pairChangedState(p);
-                        };
-                        Log.debug("added candidate pair " + p.toString());
+        if ((l != null) && (r != null)) {
+            if (l.getProtocol() == r.getProtocol() && l.getIpVersion() == r.getIpVersion()) {
+                synchronized (candidatePairs) {
+                    boolean present = candidatePairs.stream().anyMatch((RTCIceCandidatePair p) -> {
+                        return (l.sameFoundation(p.getLocal()) && r.sameFoundation(p.getRemote()));
+                    });
+                    if (!present) {
+                        RTCIceCandidatePair p = new RTCIceCandidatePair(l, r);
+                        if (p != null) {
+                            p.setState(RTCIceCandidatePairState.FROZEN);
+                            ret = p;
+                            candidatePairs.add(p);
+                            p.onStateChange = (data) -> {
+                                this.pairChangedState(p);
+                            };
+                            Log.debug("added candidate pair " + p.toString());
+                        }
+                    } else {
+                        Log.debug("ignoring due to exisiting candidate pair " + r.toString() + " " + l.toString());
                     }
-                } else {
-                    Log.debug("ignoring due to exisiting candidate pair " + r.toString() + " " + l.toString());
                 }
+            } else {
+                Log.verb("ignoring incompatiple candidate pair " + r.toString() + " " + l.toString());
             }
         } else {
-            Log.verb("ignoring incompatiple candidate pair " + r.toString() + " " + l.toString());
+            Log.error("only half a pair of candidates to add " + l + " and " + r);
         }
         return ret;
     }
@@ -392,7 +396,7 @@ public class RTCIceTransport {
         return ice.getMTU();
     }
 
-   /* 
+    /* 
     public void pruneExcept(RTCIceCandidatePair sp) {
         if (sp != null) {
             transMan.pruneExcept(sp);
@@ -403,8 +407,7 @@ public class RTCIceTransport {
             Log.debug("pruned candidate Pairs to _just_ selected pair");
         }
     } 
-    */
-
+     */
     public void listPairs() {
         candidatePairs.forEach((p) -> {
             Log.debug(p.toString());

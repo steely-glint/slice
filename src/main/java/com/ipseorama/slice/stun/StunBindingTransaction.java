@@ -19,8 +19,7 @@ import java.nio.channels.DatagramChannel;
 public class StunBindingTransaction extends StunTransaction implements RTCEventData {
 
     protected InetSocketAddress _far;
-    final static int TIMEOUT = 200; // a stun server that responds in > 1sec isn't of intrest.
-    final static int MAXTRIES = 4;
+    final static int TIMEOUTS[] = {4,10,40,100,200,400,400}; // a stun server that responds in > 1sec isn't of intrest.
     protected InetSocketAddress _ref;
     StunBindingRequest inbound = null;
     StunBindingResponse response;
@@ -65,7 +64,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     public StunPacket buildOutboundPacket() {
         StunPacket bind = null;
         if (inbound == null) { // near is the requestor...
-            if (retries > MAXTRIES) {
+            if (retries >= TIMEOUTS.length) {
                 RTCTimeoutEvent e = new RTCTimeoutEvent();
                 complete = true;
                 if (oncomplete != null) {
@@ -75,7 +74,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
                 bind = new StunBindingRequest();
                 bind.setTid(this.getTid());
                 bind.setFar(_far);
-                dueTime = ice.nextAvailableTime() + (TIMEOUT * retries++);
+                dueTime = ice.nextAvailableTime() + TIMEOUTS[retries++];
             }
         } else {
             // someone sent us a request.

@@ -9,6 +9,7 @@ import com.ipseorama.slice.IceEngine;
 import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.phono.srtplight.Log;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 
 /**
@@ -101,6 +102,12 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
             response = (StunBindingResponse) r;
             if (response.hasRequiredAttributes()) {
                 complete = true;
+                InetSocketAddress reflex = response.getReflex();
+                if (this._far.equals(reflex)){
+                    Log.debug("far ip confirmed as "+reflex);
+                } else {
+                    Log.info("new Ip found (peer reflexive) "+reflex+" on "+this.candidatePair);
+                }
                 if (oncomplete != null) {
                     oncomplete.onEvent(this);
                 }
