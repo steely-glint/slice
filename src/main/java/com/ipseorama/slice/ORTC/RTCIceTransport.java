@@ -214,6 +214,9 @@ public class RTCIceTransport {
         Optional<RTCIceCandidatePair> ret = null;
         synchronized (candidatePairs) {
             ret = candidatePairs.stream()
+                    /*.filter((RTCIceCandidatePair icp) -> {
+                        return !transMan.localIsBusy(icp); // dont list any where there is a transaction in flight, it confuses NAT
+                    })*/
                     .filter((RTCIceCandidatePair icp) -> {
                         return icp.getState() == targetState;
                     })

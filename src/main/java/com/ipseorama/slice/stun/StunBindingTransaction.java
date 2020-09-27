@@ -19,7 +19,7 @@ import java.nio.channels.DatagramChannel;
 public class StunBindingTransaction extends StunTransaction implements RTCEventData {
 
     protected InetSocketAddress _far;
-    final static int TIMEOUTS[] = {4,10,40,100,200,400,400}; // a stun server that responds in > 1sec isn't of intrest.
+    final static int TIMEOUTS[] = {40,100,200,300,400}; // a stun server that responds in > 1sec isn't of intrest.
     protected InetSocketAddress _ref;
     StunBindingRequest inbound = null;
     StunBindingResponse response;

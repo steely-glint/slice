@@ -8,6 +8,7 @@ package com.ipseorama.slice.stun;
 import com.ipseorama.slice.ORTC.RTCEventData;
 import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import com.ipseorama.slice.ORTC.RTCIceTransport;
+import com.ipseorama.slice.ORTC.RTCLocalIceCandidate;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.phono.srtplight.Log;
 import java.util.Arrays;
@@ -210,6 +211,16 @@ public class StunTransactionManager {
                     && !sa.isComplete();
         });
 
+    }
+
+    public boolean localIsBusy(RTCIceCandidatePair icp) {
+        RTCLocalIceCandidate local = icp.getLocal();
+        return transactions.stream().anyMatch((StunTransaction sa) -> {
+            Log.debug("----> busy check " + sa);
+            return (sa instanceof IceStunBindingTransaction)
+                    && ((((IceStunBindingTransaction) sa).getPair()).getLocal() == local)
+                    && !sa.isComplete();
+        });
     }
 
 }
