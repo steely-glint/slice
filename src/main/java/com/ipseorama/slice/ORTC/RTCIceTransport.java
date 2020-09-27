@@ -70,15 +70,21 @@ public class RTCIceTransport {
         }
         this.role = role;
         gatherer.onlocalcandidate = (RTCEventData c) -> {
-            if (c instanceof RTCLocalIceCandidate) {
-                RTCLocalIceCandidate l = (RTCLocalIceCandidate) c;
-                List<RTCIceCandidate> remotes = new ArrayList(remoteCandidates);
-                for (RTCIceCandidate r : remotes) {
-                    addPair(l, r);
+            if (c instanceof RTCLocalIceReflexCandidate) {
+                Log.warn("Not pairing local reflex candidate "+((RTCLocalIceReflexCandidate) c).toString());
+            } else {
+                if (c instanceof RTCLocalIceCandidate) {
+                    RTCLocalIceCandidate l = (RTCLocalIceCandidate) c;
+                    List<RTCIceCandidate> remotes = new ArrayList(remoteCandidates);
+                    for (RTCIceCandidate r : remotes) {
+                        addPair(l, r); // actually adds pair to the ICE algo
+                    }
+                } else {
+                    Log.warn("Ignoring candidate event "+c);
                 }
             }
             if (oldAct != null) {
-                oldAct.onEvent(c);
+                oldAct.onEvent(c); // sends candidate to far side.
             }
         };
 

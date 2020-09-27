@@ -139,7 +139,10 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 rx(delay);
             }
             Log.debug("quit ICE rcv loop");
-            _transM.getTransport().disconnectedSelected();
+            RTCIceTransport t = _transM.getTransport();
+            if (t != null) {
+                t.disconnectedSelected();
+            }
         } catch (SocketException ex) {
             Log.error("Can't set timer in rcv loop");
         }

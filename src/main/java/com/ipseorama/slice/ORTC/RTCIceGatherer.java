@@ -367,6 +367,7 @@ For incoming connectivity checks that pass validation,
             ret = createDatagramChannel("0.0.0.0");
             ret.register(_selector, SelectionKey.OP_READ);
             Log.debug("had to create new channel for STUN");
+            //addButDontSendLocalCandidate(ret);
         }
         return ret;
     }
@@ -427,13 +428,14 @@ For incoming connectivity checks that pass validation,
 
                                             String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
                                             long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
-                                            RTCLocalIceCandidate rcand = new RTCLocalIceCandidate(foundation,
+                                            RTCLocalIceCandidate rcand = new RTCLocalIceReflexCandidate(foundation,
                                                     priority,
                                                     ref.getAddress().getHostAddress(),
                                                     prot,
                                                     (char) ref.getPort(),
                                                     type,
                                                     null, reflexC);
+                                            
                                             rcand.setRelatedAddress(raddr.getHostAddress());
                                             rcand.setRelatedPort(rport);
                                             if (ref.getAddress() instanceof java.net.Inet4Address) {
@@ -446,7 +448,7 @@ For incoming connectivity checks that pass validation,
                                             } catch (IOException x) {
                                                 Log.warn("reflex candidate without rhost/rport " + x.getMessage());
                                             }
-                                            addLocalCandidate(rcand);
+                                            addLocalCandidate(rcand); // but don't pair it.
                                         }
                                     }
                                     _stm.removeComplete();

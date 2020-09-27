@@ -103,16 +103,18 @@ public class StunTransactionManager {
     }
 
     public void makeWork() { // RFC 8445 way
-        RTCIceCandidatePair p = transport.nextCheck();
-        if (p != null) {
-            StunTransaction transact = p.queued(this.transport); // never nominate  on first pass...
-            transact.onerror = (RTCEventData e) -> {
-                transport.onError(e);
-            };
-            Log.debug("Adding outbound transaction \n\t" + transact.toString() + "\n\t for " + p);
-            addTransaction(transact);
-        } else {
-            Log.debug("Nothing to check");
+        if (transport != null) {
+            RTCIceCandidatePair p = transport.nextCheck();
+            if (p != null) {
+                StunTransaction transact = p.queued(this.transport); // never nominate  on first pass...
+                transact.onerror = (RTCEventData e) -> {
+                    transport.onError(e);
+                };
+                Log.debug("Adding outbound transaction \n\t" + transact.toString() + "\n\t for " + p);
+                addTransaction(transact);
+            } else {
+                Log.debug("Nothing to check");
+            }
         }
     }
 
@@ -184,16 +186,20 @@ public class StunTransactionManager {
                 // 3) anything old
                 boolean old = ((IceStunBindingTransaction) sa).dueTime < when;
                 ret = (others || complete || old);
-                Log.debug(ret ?"remove ":"keep "+sa.toString()+" ("+others+" "+complete+" "+old+")");
+                Log.debug(ret ? "remove " : "keep " + sa.toString() + " (" + others + " " + complete + " " + old + ")");
             } else {
-                Log.debug("remove " + sa +" not ICE trans");
+                Log.debug("remove " + sa + " not ICE trans");
             }
             return ret;
         });
     }
 
     public void listPairs() {
-        this.transport.listPairs();
+        if (transport != null){
+            transport.listPairs();
+        } else {
+            Log.warn("No transport, so no pairs");
+        }
     }
 
     public boolean pairHasActiveTrans(RTCIceCandidatePair sp) {
