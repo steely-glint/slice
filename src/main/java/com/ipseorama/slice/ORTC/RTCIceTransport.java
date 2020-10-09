@@ -10,6 +10,7 @@ import com.ipseorama.slice.ORTC.enums.RTCIceCandidatePairState;
 import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
 import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
+import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.stun.StunAttribute;
 import com.ipseorama.slice.stun.StunBindingRequest;
@@ -71,7 +72,7 @@ public class RTCIceTransport {
         this.role = role;
         gatherer.onlocalcandidate = (RTCEventData c) -> {
             if (c instanceof RTCLocalIceReflexCandidate) {
-                Log.warn("Not pairing local reflex candidate "+((RTCLocalIceReflexCandidate) c).toString());
+                Log.debug("Not pairing local reflex candidate " + ((RTCLocalIceReflexCandidate) c).toString());
             } else {
                 if (c instanceof RTCLocalIceCandidate) {
                     RTCLocalIceCandidate l = (RTCLocalIceCandidate) c;
@@ -80,7 +81,7 @@ public class RTCIceTransport {
                         addPair(l, r); // actually adds pair to the ICE algo
                     }
                 } else {
-                    Log.warn("Ignoring candidate event "+c);
+                    Log.warn("Ignoring candidate event " + c);
                 }
             }
             if (oldAct != null) {
@@ -212,19 +213,23 @@ public class RTCIceTransport {
 
     public RTCIceCandidatePair nextCheck(RTCIceCandidatePairState targetState) {
         Optional<RTCIceCandidatePair> ret = null;
-        synchronized (candidatePairs) {
-            ret = candidatePairs.stream()
-                    /*.filter((RTCIceCandidatePair icp) -> {
+        if (this.iceGatherer.getState() == RTCIceGathererState.COMPLETE) {
+            synchronized (candidatePairs) {
+                ret = candidatePairs.stream()
+                        /*.filter((RTCIceCandidatePair icp) -> {
                         return !transMan.localIsBusy(icp); // dont list any where there is a transaction in flight, it confuses NAT
                     })*/
-                    .filter((RTCIceCandidatePair icp) -> {
-                        return icp.getState() == targetState;
-                    })
-                    .limit(MAXCHECKS)
-                    .sorted(ordering)
-                    .findFirst();
+                        .filter((RTCIceCandidatePair icp) -> {
+                            return icp.getState() == targetState;
+                        })
+                        .limit(MAXCHECKS)
+                        .sorted(ordering)
+                        .findFirst();
+            }
+        } else {
+            Log.info("still gathering...");
         }
-        return ret.isPresent() ? ret.get() : null;
+        return ((ret !=null) && ret.isPresent()) ? ret.get() : null;
     }
 
     private boolean checkRoleOk(StunBindingRequest sbr) {

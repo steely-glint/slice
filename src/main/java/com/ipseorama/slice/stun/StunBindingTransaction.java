@@ -19,12 +19,21 @@ import java.nio.channels.DatagramChannel;
 public class StunBindingTransaction extends StunTransaction implements RTCEventData {
 
     protected InetSocketAddress _far;
-    final static int TIMEOUTS[] = {40,100,200,300,400}; // a stun server that responds in > 1sec isn't of intrest.
+    final static int TIMEOUTS[] = {100, 100, 200, 300, 400}; // a stun server that responds in > 1sec isn't of intrest.
     protected InetSocketAddress _ref;
     StunBindingRequest inbound = null;
     StunBindingResponse response;
     IceEngine ice;
     private DatagramChannel _channel;
+    public static final int MAXTIME;
+
+    static {
+        int maxtime = 0;
+        for (int t : TIMEOUTS) {
+            maxtime += t;
+        }
+        MAXTIME = maxtime;
+    }
 
     public StunBindingTransaction(IceEngine e, String host, int port) {
         super();
@@ -33,7 +42,7 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
         dueTime = ice.nextAvailableTime();
     }
 
-    public StunBindingTransaction(IceEngine e,StunBindingRequest sbreq) {
+    public StunBindingTransaction(IceEngine e, StunBindingRequest sbreq) {
         super(sbreq);
         _far = sbreq.getFar();
         inbound = sbreq;
@@ -89,14 +98,14 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
                 oncomplete.onEvent(null);
             }
         }
-        if (_channel == null){
-            throw new NullPointerException("Channel is null "+this.toString());
+        if (_channel == null) {
+            throw new NullPointerException("Channel is null " + this.toString());
         } else {
             if (bind != null) {
                 bind.setChannel(_channel);
             }
         }
-        
+
         return bind;
     }
 
@@ -114,8 +123,8 @@ public class StunBindingTransaction extends StunTransaction implements RTCEventD
     public void setChannel(DatagramChannel chan) {
         _channel = chan;
     }
-    
-    public DatagramChannel getChannel(){
+
+    public DatagramChannel getChannel() {
         return _channel;
     }
 

@@ -11,6 +11,7 @@ import com.ipseorama.slice.ORTC.RTCIceTransport;
 import com.ipseorama.slice.ORTC.RTCLocalIceCandidate;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
+import com.ipseorama.slice.stun.StunBindingTransaction;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunPacketException;
 import com.ipseorama.slice.stun.StunTransactionManager;
@@ -50,7 +51,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
     private Map<String, String> miPass = new HashMap();
     long nextAvailableTime;
     private RTCIceCandidatePair selected;
-    static int sliceid=0;
+    private Long selectedAt = null;
+    static int sliceid = 0;
 
     public synchronized void start(Selector s, StunTransactionManager tm) {
         if (_started) {
@@ -71,6 +73,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 switch (tstate) {
                     case COMPLETED:
                         selected = transP.getSelectedCandidatePair();
+                        selectedAt = System.currentTimeMillis();
                         _transM.pruneExcept(selected, System.currentTimeMillis());
                         removeUnselectedChannels(); // that's not really RFC 
                         Log.debug("SELECTED ->> " + selected);
@@ -95,7 +98,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
         Runnable ior = () -> {
             loop();
         };
-        _rcv = new Thread(ior, "nio-ice-"+sliceid+":");
+        _rcv = new Thread(ior, "nio-ice-" + sliceid + ":");
         sliceid++;
         _rcv.setPriority(Thread.MAX_PRIORITY);
         _rcv.start();
@@ -193,7 +196,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                     Log.debug("stashed DTLS packet - no selected pair - yet...");
                 } else {
                     Log.debug("No matching pair found ?!?!");
-                    Log.debug("DTLS came in on channel "+dgc.toString()+" far "+far);
+                    Log.debug("DTLS came in on channel " + dgc.toString() + " far " + far);
                     _transM.getTransport().listPairs();
                 }
             }
@@ -230,7 +233,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 delay = POLL;
             }
         }
-        if (this.selected == null){
+        if (this.selected == null) {
             Log.debug("delay is  =" + delay);
         }
 
@@ -248,21 +251,27 @@ public class SingleThreadNioIceEngine implements IceEngine {
                         if (!readPacket(key)) {
                             break;
                         }
-                    } catch (StunPacketException mex){
+                    } catch (StunPacketException mex) {
                         // non fatal exception
-                        Log.warn("Weird Stun packet - ignoring it... "+mex.getClass().getCanonicalName()+" "+mex.getMessage());
-                        Log.debug("packet was "+mex.getPacket());
-                    } catch (java.net.PortUnreachableException pox){
-                        Log.warn("Port unreachable exception on "+key.attachment()+" message "+pox.getMessage());
-                    }catch (Exception x) {
+                        Log.debug("Weird Stun packet - ignoring it... " + mex.getClass().getCanonicalName() + " " + mex.getMessage());
+                        Log.debug("packet was " + mex.getPacket());
+                        Log.debug("packet contained " + mex.getPacket().listAttribs());
+                    } catch (java.net.PortUnreachableException pox) {
+                        if (selectedAt != null) {
+                            if ((now - selectedAt) > StunBindingTransaction.MAXTIME) {
+                                Log.info("ICMP long after selection - assuming channel has gone.");
+                                cancelChannel(key, pox);
+                                throw (pox);
+                            }
+                        } else {
+                            Log.debug("Port unreachable exception on " + key.attachment() + " message " + pox.getMessage());
+                        }
+                    } catch (Exception x) {
                         // all other exceptions close the channel.
-                        //Log.debug("Cancelling "+key.attachment()+" because "+x.toString());
-                        //if (key.isValid()){
-                        //    key.cancel();
-                        //}
-                        Log.warn("Exception "+x+" on packet recv. Not closing dgc ");
+                        cancelChannel(key, x);
+                        Log.warn("Exception " + x + " on packet recv. Not closing dgc ");
                         // to do - strictly we should tell the candidatePair that it has gone bad...
-                        throw(x); // see if there are any channels left to listen on.
+                        throw (x); // see if there are any channels left to listen on.
                     }
                 }
                 iter.remove();
@@ -276,16 +285,20 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 Log.debug("assuming consent revoked");
                 _rcv = null;
             }
-
         } catch (Exception x) {
-            Optional<SelectionKey> valid = _selector.keys().stream().filter((SelectionKey key) -> {
-                Log.debug("channel attached to " + key.attachment());
-                return key.isValid() && (key.channel().isOpen());
-            }).findAny();
-            if (valid.isPresent()) {
-                Object att = valid.get().attachment();
-                Log.debug("Still have valid channel on " + att + " not giving up...");
-            } else {
+            boolean haveValid = false;
+            if (_selector.isOpen()) {
+                Optional<SelectionKey> valid = _selector.keys().stream().filter((SelectionKey key) -> {
+                    Log.debug("channel attached to " + key.attachment());
+                    return key.isValid() && (key.channel().isOpen());
+                }).findAny();
+                if (valid.isPresent()) {
+                    Object att = valid.get().attachment();
+                    Log.debug("Still have valid channel on " + att + " not giving up...");
+                    haveValid = true;
+                }
+            }
+            if (!haveValid) {
                 _rcv = null;
                 Log.debug("Ice Selector out of valid channels,  quitting rcv loop");
             }
@@ -294,6 +307,13 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 Log.warn("Exception in ICE rcv loop");
                 x.printStackTrace(System.out);
             }
+        }
+    }
+
+    private void cancelChannel(SelectionKey key, Exception x) {
+        Log.debug("Cancelling " + key.attachment() + " because " + x.toString());
+        if (key.isValid()) {
+            key.cancel();
         }
     }
 
@@ -328,8 +348,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
         } catch (Exception x) {
             Log.error("Exception in tx " + x);
             StackTraceElement[] trace = x.getStackTrace();
-            for (StackTraceElement el:trace){
-                Log.warn("\n\t "+el.toString());
+            for (StackTraceElement el : trace) {
+                Log.warn("\n\t " + el.toString());
             }
         }
         long nextTime = _transM.nextDue();
@@ -371,7 +391,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 }
                 key.cancel();
             } else {
-                Log.debug("keeping selected channel "+kc );
+                Log.debug("keeping selected channel " + kc);
             }
         });
     }

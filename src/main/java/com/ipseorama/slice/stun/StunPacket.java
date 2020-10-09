@@ -213,7 +213,7 @@ public class StunPacket {
                 if (st != null) {
                     Log.debug("looking in transaction");
                     username = st.getUserName();
-                    Log.verb("found username in transaction " + username);
+                    Log.debug("found username in transaction " + username);
                 }
             }
             if ((username == null) && (st == null)) {
@@ -292,7 +292,7 @@ public class StunPacket {
     The idea of these static methods is basically paranoia - no stunpacket object is created untill
     the packet has passed validation checks. It also ensures we can create the correct type.
      */
-    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near, StunTransactionManager stm) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException, StunPacketException  {
+    public static StunPacket mkStunPacket(byte[] inbound, Map<String, String> miPass, InetSocketAddress near, StunTransactionManager stm) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException, StunPacketException {
         StunPacket ret = null;
         if (inbound.length >= 20) {
             ByteBuffer b_frame = ByteBuffer.wrap(inbound);
@@ -330,33 +330,42 @@ public class StunPacket {
                                         });
                                     }
                                 }
-                                throw new MessageIntegrityException("No pass available...",ret); 
+                                throw new MessageIntegrityException("No pass available...", ret);
                             }
                         }
-                        validatePacket(attributes, fingerprint, messageIntegrity);
-                        switch (mtype) {
-                            case 0x0101:
-                                ret = new StunBindingResponse(mtype, fingerprint, attributes, messageIntegrity, near);
-                                break;
-                            case 0x0110:
-                                ret = new StunErrorResponse(mtype, fingerprint, attributes, messageIntegrity, near);
-                                break;
-                            case 0x0001:
-                                ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity, near);
-                                break;
-                            case 0x0010:
-                                ret = new StunIndication(mtype, fingerprint, attributes, messageIntegrity, near);
-                                break;
-                            default:
-                                ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity, near);
-                                break;
+                        try {
+                            switch (mtype) {
+                                case 0x0101:
+                                    ret = new StunBindingResponse(mtype, fingerprint, attributes, messageIntegrity, near);
+                                    break;
+                                case 0x0110:
+                                    ret = new StunErrorResponse(mtype, fingerprint, attributes, messageIntegrity, near);
+                                    break;
+                                case 0x0001:
+                                    ret = new StunBindingRequest(mtype, fingerprint, attributes, messageIntegrity, near);
+                                    break;
+                                case 0x0010:
+                                    ret = new StunIndication(mtype, fingerprint, attributes, messageIntegrity, near);
+                                    break;
+                                default:
+                                    ret = new StunPacket(mtype, fingerprint, attributes, messageIntegrity, near);
+                                    break;
+                            }
+                            if (ret != null) {
+                                ret.setTid(tid);
+                                ret.setPass(pass);
+                            }
+                            // I'd _really_ rather validate this packet before we parse it - but 
+                            // then the exception doesn't have a packet for debug...
+                            validatePacket(attributes, fingerprint, messageIntegrity);
+                        } catch (MessageIntegrityException mex) {
+                            mex.setPacket(ret);
+                            ret = null;
+                            throw (mex);
                         }
-                        if (ret != null) {
-                            ret.setTid(tid);
-                            ret.setPass(pass);
-                        }
+
                     } else {
-                        throw new StunPacketException("implausible length param " + mlen + " not less than " + (inbound.length - 20),ret);
+                        throw new StunPacketException("implausible length param " + mlen + " not less than " + (inbound.length - 20), ret);
                     }
                 } else {
                     throw new StunPacketException(" invalid stun cookie");
@@ -405,7 +414,7 @@ public class StunPacket {
             throw new FingerPrintException();
         }
         if (!miOk && messageIntegrity != null) { // ie we were expecting a message integrity check 
-            throw new MessageIntegrityException();
+            throw new MessageIntegrityException("Expected a MessageIntegrity but it didn't checkout...");
         }
     }
 
@@ -473,8 +482,6 @@ public class StunPacket {
         return this._channel;
     }
 
-
-
     public static String hexString(byte[] buf) {
         StringBuilder b = new StringBuilder();
 
@@ -490,5 +497,10 @@ public class StunPacket {
 
     public String toString() {
         return "Stun pkt " + this.getClass().getSimpleName() + " far =" + this._far + " near =" + this._near;
+    }
+    public String listAttribs(){
+        StringBuffer retB = new StringBuffer();
+        this._attributes.forEach((a) -> { retB.append(a.toString(_tid)).append(" ");} );
+        return retB.toString();
     }
 }
