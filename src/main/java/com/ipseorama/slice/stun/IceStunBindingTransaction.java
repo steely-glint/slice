@@ -106,7 +106,7 @@ public class IceStunBindingTransaction extends StunBindingTransaction {
                 if (this._far.equals(reflex)){
                     Log.debug("far ip confirmed as "+reflex);
                 } else {
-                    Log.info("new Ip found (peer reflexive) "+reflex+" on "+this.candidatePair);
+                    Log.debug("new Ip found (peer reflexive) "+reflex+" on "+this.candidatePair);
                 }
                 if (oncomplete != null) {
                     oncomplete.onEvent(this);

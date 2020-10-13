@@ -331,10 +331,14 @@ public class SingleThreadNioIceEngine implements IceEngine {
                         if (far != null) {
                             Log.verb(StunPacket.hexString(sp.getTid()) + " sending packet type " + sp.getClass().getSimpleName() + " length " + o.length + "  to " + far);
                             ByteBuffer src = ByteBuffer.wrap(o);
-                            if (ch.isConnected()) {
-                                ch.write(src);
+                            if (ch.isOpen()) {
+                                if (ch.isConnected()) {
+                                    ch.write(src);
+                                } else {
+                                    ch.send(src, far);
+                                }
                             } else {
-                                ch.send(src, far);
+                                Log.debug("chanel is closed "+ch);
                             }
                         } else {
                             Log.verb("not sending packet to unresolved address");
