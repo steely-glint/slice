@@ -39,7 +39,7 @@ import java.util.Set;
  *
  */
 public class SingleThreadNioIceEngine implements IceEngine {
-
+    
     StunTransactionManager _transM;
     private Selector _selector;
     private Thread _rcv;
@@ -53,7 +53,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
     private RTCIceCandidatePair selected;
     private Long selectedAt = null;
     static int sliceid = 0;
-
+    
     public synchronized void start(Selector s, StunTransactionManager tm) {
         if (_started) {
             throw new java.lang.IllegalStateException("Can't start a Threaded Ice engine more than once.");
@@ -90,11 +90,11 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 }
             };
         }
-
+        
         if ((_selector == null) || (_transM == null)) {
             throw new java.lang.IllegalArgumentException("Need non-null selector and transaction manager to start");
         }
-
+        
         Runnable ior = () -> {
             loop();
         };
@@ -103,9 +103,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
         _rcv.setPriority(Thread.MAX_PRIORITY);
         _rcv.start();
         _started = true;
-
+        
     }
-
+    
     @Override
     public long nextAvailableTime() {
         long now = System.currentTimeMillis();
@@ -116,7 +116,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
         nextAvailableTime += Ta;
         return ret;
     }
-
+    
     @Override
     public void addIceCreds(String user, String pass) {
         miPass.put(user, pass);
@@ -127,9 +127,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
             });
         }
     }
-
+    
     long packetRxTime = 0;
-
+    
     private void loop() {
         try {
             packetRxTime = System.currentTimeMillis();
@@ -150,7 +150,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
             Log.error("Can't set timer in rcv loop");
         }
     }
-
+    
     private boolean readPacket(SelectionKey key) throws Exception {
         ByteBuffer recbuf = ByteBuffer.allocate(mtu);
         DatagramChannel dgc = (DatagramChannel) key.channel();
@@ -203,7 +203,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
         } else if (b < 0) {
             if (selected != null) {
                 DatagramPacket dgp = new DatagramPacket(new byte[0], 0);
-
+                
                 dgp.setSocketAddress(far);
                 dgp.setData(rec);
                 dgp.setLength(len);
@@ -218,12 +218,12 @@ public class SingleThreadNioIceEngine implements IceEngine {
         packetRxTime = System.currentTimeMillis();
         return true;
     }
-
+    
     private void rx(Long nextTime) throws SocketException {
         //InetSocketAddress near = (InetSocketAddress) _sock.getLocalSocketAddress();
         int delay = POLL;
         long now = System.currentTimeMillis();
-
+        
         if (nextTime != null) {
             delay = (int) (nextTime - now);
             if (delay <= 0) {
@@ -236,15 +236,15 @@ public class SingleThreadNioIceEngine implements IceEngine {
         if (this.selected == null) {
             Log.debug("delay is  =" + delay);
         }
-
+        
         try {
-
+            
             int keys = _selector.select(delay);
             Log.verb("Selection key count =" + keys);
             Set<SelectionKey> selectedKeys = _selector.selectedKeys();
             Iterator<SelectionKey> iter = selectedKeys.iterator();
             while (iter.hasNext()) {
-
+                
                 SelectionKey key = iter.next();
                 while (key.isReadable() && key.isValid()) {
                     try {
@@ -276,10 +276,10 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 }
                 iter.remove();
             }
-
+            
             long interval = now - packetRxTime;
             Log.verb("Time since packet rcv " + interval);
-
+            
             if (interval > MAXSILENCE * POLL) {
                 Log.debug("Time since packet rcv " + interval);
                 Log.debug("assuming consent revoked");
@@ -302,21 +302,21 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 _rcv = null;
                 Log.debug("Ice Selector out of valid channels,  quitting rcv loop");
             }
-
+            
             if (Log.getLevel() >= Log.DEBUG) {
                 Log.warn("Exception in ICE rcv loop");
                 x.printStackTrace(System.out);
             }
         }
     }
-
+    
     private void cancelChannel(SelectionKey key, Exception x) {
         Log.debug("Cancelling " + key.attachment() + " because " + x.toString());
         if (key.isValid()) {
             key.cancel();
         }
     }
-
+    
     private Long tx() {
         try {
             long now = System.currentTimeMillis();
@@ -324,25 +324,29 @@ public class SingleThreadNioIceEngine implements IceEngine {
             tos = _transM.transact(now);
             if (tos != null) {
                 for (StunPacket sp : tos) {
-                    if (sp != null) {
-                        byte o[] = sp.outboundBytes(miPass);
-                        DatagramChannel ch = sp.getChannel();
-                        InetSocketAddress far = sp.getFar();
-                        if (far != null) {
-                            Log.verb(StunPacket.hexString(sp.getTid()) + " sending packet type " + sp.getClass().getSimpleName() + " length " + o.length + "  to " + far);
-                            ByteBuffer src = ByteBuffer.wrap(o);
-                            if (ch.isOpen()) {
-                                if (ch.isConnected()) {
-                                    ch.write(src);
+                    try {
+                        if (sp != null) {
+                            byte o[] = sp.outboundBytes(miPass);
+                            DatagramChannel ch = sp.getChannel();
+                            InetSocketAddress far = sp.getFar();
+                            if (far != null) {
+                                Log.verb(StunPacket.hexString(sp.getTid()) + " sending packet type " + sp.getClass().getSimpleName() + " length " + o.length + "  to " + far);
+                                ByteBuffer src = ByteBuffer.wrap(o);
+                                if (ch.isOpen()) {
+                                    if (ch.isConnected()) {
+                                        ch.write(src);
+                                    } else {
+                                        ch.send(src, far);
+                                    }
                                 } else {
-                                    ch.send(src, far);
+                                    Log.debug("chanel is closed " + ch);
                                 }
                             } else {
-                                Log.debug("chanel is closed "+ch);
+                                Log.verb("not sending packet to unresolved address");
                             }
-                        } else {
-                            Log.verb("not sending packet to unresolved address");
                         }
+                    } catch (java.net.PortUnreachableException pux) {
+                        Log.warn("port unreachable for outbound "+sp.getFar());
                     }
                 }
             }
@@ -360,25 +364,25 @@ public class SingleThreadNioIceEngine implements IceEngine {
         Log.verb("not removing complete ICE stun transactions for now... ");
         return nextTime;
     }
-
+    
     @Override
     public boolean isStarted() {
         return _started;
     }
-
+    
     @Override
     public StunTransactionManager getTransactionManager() {
         return this._transM;
     }
-
+    
     public void stop() {
         _rcv = null;
     }
-
+    
     public int getMTU() {
         return mtu;
     }
-
+    
     private void removeUnselectedChannels() {
         // this isn't correct webRTC behaviour - but really accepting data on a
         // unselected channels is a mistake.
@@ -399,5 +403,5 @@ public class SingleThreadNioIceEngine implements IceEngine {
             }
         });
     }
-
+    
 }

@@ -149,7 +149,9 @@ public class StunAttribute {
     private boolean _xor;
 
     String getName() {
-        return findName(aType);
+        String ret = findName(aType);
+        if (ret == null){ ret = "unknown:"+aType;}
+        return ret;
     }
 
     void setString(String s) {
