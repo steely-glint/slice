@@ -289,14 +289,18 @@ public class RTCIceTransport {
                     if (pair == null) {
                         Log.verb("about to mkpair from " + sbr.toString() + " ipv" + ipv);
                         pair = mkPair(sbr, prot, ipv);
-                        Log.verb("create pair " + pair.toString() + " ipv" + ipv);
+                        Log.verb("create pair " + ((pair==null)?"Failed ":pair.toString()) + " ipv" + ipv);
                     }
                     StunTransaction replyTrans = null;
                     if (checkRoleOk(sbr)) {
                         replyTrans = new StunBindingTransaction(ice, sbr);
                         replyTrans.setCause("inbound");
-                        pair.recvdInbound(sbr, this, transMan);
-                        Log.verb("adding " + replyTrans.toString() + " to do reply");
+                        if(pair != null){
+                            pair.recvdInbound(sbr, this, transMan);
+                            Log.verb("adding " + replyTrans.toString() + " to do reply");
+                        } else {
+                            Log.verb("Not adding " + replyTrans.toString() + " to do reply");
+                        }
                     } else {
                         replyTrans = new StunErrorTransaction(ice, sbr);
                     }
@@ -423,9 +427,12 @@ public class RTCIceTransport {
     } 
      */
     public void listPairs() {
-        candidatePairs.forEach((p) -> {
-            Log.debug(p.toString());
-        });
+        
+        StringBuffer list = new StringBuffer();
+        synchronized (candidatePairs) {
+            candidatePairs.stream().forEach((p) -> {list.append(p.toString()).append("\n");});
+        }
+        Log.debug(list.toString());
     }
 
     public boolean setSelected(RTCIceCandidatePair sel) {

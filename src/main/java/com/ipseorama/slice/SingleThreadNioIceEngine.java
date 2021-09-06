@@ -135,7 +135,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
             packetRxTime = System.currentTimeMillis();
             while (_rcv != null) {
                 Long delay = tx();
-                if (Log.getLevel() > Log.DEBUG) {
+                if ((selected == null) && (Log.getLevel() > Log.DEBUG)) {
                     Log.debug("-----> candidate Pair States <------");
                     _transM.listPairs();
                 }
