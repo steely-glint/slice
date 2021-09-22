@@ -175,7 +175,7 @@ public class RTCIceCandidatePair implements RTCEventData {
             checkedOut = true;
             // well, this way works.
             farIP = ret.getFar();
-            
+
             Log.debug("got a reply to " + ret);
             if (checkedIn) {
                 // they have already sent us something...
@@ -322,6 +322,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
     }
 
     public void pushDTLSStash() {
+        Log.debug("Empty DTLS packet stash of " + packetStash.size() + " on " + this.toString());
         packetStash.forEach((byte[] pkt) -> {
             this.pushDTLS(pkt);
         });
@@ -330,6 +331,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
 
     public void stashPacket(byte[] rec) {
         packetStash.add(rec);
+        Log.debug("Added to DTLS packet stash of " + packetStash.size() + " on " + this.toString());
     }
 
     public boolean sameAsMe(DatagramChannel c, InetSocketAddress f) {

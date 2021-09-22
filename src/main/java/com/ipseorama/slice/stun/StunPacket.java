@@ -9,6 +9,7 @@ import com.ipseorama.slice.stun.StunPacketException.FingerPrintException;
 import com.ipseorama.slice.stun.StunPacketException.MessageIntegrityException;
 import com.phono.srtplight.Log;
 import java.net.InetSocketAddress;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.security.InvalidKeyException;
@@ -123,7 +124,7 @@ public class StunPacket {
     static ArrayList<StunAttribute> parseAttributes(ByteBuffer a_frame) {
         ArrayList<StunAttribute> buf = new ArrayList();
         while (a_frame.remaining() >= 4) {
-            int startpos = a_frame.position() + 20;
+            int startpos = ((Buffer)a_frame).position() + 20;
             char a_type = a_frame.getChar();
             int a_len = a_frame.getChar();
             byte[] val = new byte[a_len];
@@ -149,24 +150,24 @@ public class StunPacket {
     static int putAttributes(ByteBuffer bb, ArrayList<StunAttribute> attributes, byte[] pass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
         int len = 0;
         for (StunAttribute a : attributes) {
-            Log.verb("putting attribute " + a.getName() + " at " + bb.position());
+            Log.verb("putting attribute " + a.getName() + " at " + ((Buffer)bb).position());
             len += a.put(bb);
             bb.putChar(2, (char) len); // update the length 
             if (a.getName() != null) {
                 if (a.getName().equals("MESSAGE-INTEGRITY")) {
                     byte[] mi = calculateMessageIntegrity(pass, bb, false);
-                    int start = bb.position() - mi.length;
-                    for (int i = start; i < bb.position(); i++) {
+                    int start = ((Buffer)bb).position() - mi.length;
+                    for (int i = start; i < ((Buffer)bb).position(); i++) {
                         bb.put(i, mi[i - start]);
                     }
                 }
                 if (a.getName().equals("FINGERPRINT")) {
-                    byte[] rawpack = new byte[bb.position()];
+                    byte[] rawpack = new byte[((Buffer)bb).position()];
                     for (int i = 0; i < rawpack.length; i++) {
                         rawpack[i] = bb.get(i);
                     }
                     int fp = calculateFingerprint(rawpack);
-                    bb.putInt(bb.position() - 4, fp);
+                    bb.putInt(((Buffer)bb).position() - 4, fp);
                 }
             }
         }

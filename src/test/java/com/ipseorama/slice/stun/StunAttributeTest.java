@@ -8,6 +8,7 @@ package com.ipseorama.slice.stun;
 import com.phono.srtplight.Log;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Random;
@@ -54,7 +55,7 @@ public class StunAttributeTest {
         assertEquals("Type should match", "USERNAME", a.getName());
         ByteBuffer out = ByteBuffer.allocate(1024);
         int len = a.put(out);
-        out.position(0);
+        ((Buffer)out).position(0);
         StunAttribute a1 = new StunAttribute(new Integer(out.getChar()), out.getChar(), out);
         assertEquals("Type should match", "USERNAME", a1.getName());
         String s2 = a1.getString();
@@ -72,7 +73,7 @@ public class StunAttributeTest {
             assertEquals("Type should match", "MAPPED-ADDRESS", a.getName());
             ByteBuffer out = ByteBuffer.allocate(1024);
             int len = a.put(out);
-            out.position(0);
+            ((Buffer)out).position(0);
             StunAttribute a1 = new StunAttribute(new Integer(out.getChar()), out.getChar(), out.slice());
             assertEquals("Type should match", "MAPPED-ADDRESS", a1.getName());
             InetSocketAddress s2 = a1.getIpAddress();
@@ -94,7 +95,7 @@ public class StunAttributeTest {
         assertEquals("Type should match", "RESERVATION-TOKEN", a.getName());
         ByteBuffer out = ByteBuffer.allocate(1024);
         int len = a.put(out);
-        out.position(0);
+        ((Buffer)out).position(0);
         StunAttribute a1 = new StunAttribute(new Integer(out.getChar()), out.getChar(), out.slice());
         assertEquals("Type should match", "RESERVATION-TOKEN", a1.getName());
         byte[] rtok2 = a1.getBytes();
@@ -115,7 +116,7 @@ public class StunAttributeTest {
         assertEquals("Type should match", "UNKNOWN-ATTRIBUTES", a.getName());
         ByteBuffer out = ByteBuffer.allocate(1024);
         int len = a.put(out);
-        out.position(0);
+        ((Buffer)out).position(0);
         StunAttribute a1 = new StunAttribute(new Integer(out.getChar()), out.getChar(), out.slice());
         assertEquals("Type should match", "UNKNOWN-ATTRIBUTES", a1.getName());
         short[] ukna2 = a1.getShorts();

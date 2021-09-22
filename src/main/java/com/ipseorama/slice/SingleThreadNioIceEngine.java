@@ -19,6 +19,7 @@ import com.phono.srtplight.Log;
 import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectableChannel;
@@ -74,7 +75,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                     case COMPLETED:
                         selected = transP.getSelectedCandidatePair();
                         selectedAt = System.currentTimeMillis();
-                        _transM.pruneExcept(selected, System.currentTimeMillis());
+                        _transM.pruneExcept(selected, selectedAt+250); // clear near future stuff too.
                         removeUnselectedChannels(); // that's not really RFC 
                         Log.debug("SELECTED ->> " + selected);
                         selected.pushDTLSStash();
@@ -162,7 +163,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
         }
         InetSocketAddress near = (InetSocketAddress) dgc.getLocalAddress();
         int ipv = far.getAddress() instanceof java.net.Inet4Address ? 4 : 6;
-        recbuf.flip();
+        ((Buffer)recbuf).flip();
         int len = recbuf.remaining();
         byte rec[] = new byte[len];
         recbuf.get(rec);
@@ -244,9 +245,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
             Set<SelectionKey> selectedKeys = _selector.selectedKeys();
             Iterator<SelectionKey> iter = selectedKeys.iterator();
             while (iter.hasNext()) {
-                
                 SelectionKey key = iter.next();
-                while (key.isReadable() && key.isValid()) {
+                while (key.isValid() && key.isReadable()) {
                     try {
                         if (!readPacket(key)) {
                             break;

@@ -229,7 +229,7 @@ public class RTCIceTransport {
         } else {
             Log.info("still gathering...");
         }
-        return ((ret !=null) && ret.isPresent()) ? ret.get() : null;
+        return ((ret != null) && ret.isPresent()) ? ret.get() : null;
     }
 
     private boolean checkRoleOk(StunBindingRequest sbr) {
@@ -289,13 +289,13 @@ public class RTCIceTransport {
                     if (pair == null) {
                         Log.verb("about to mkpair from " + sbr.toString() + " ipv" + ipv);
                         pair = mkPair(sbr, prot, ipv);
-                        Log.verb("create pair " + ((pair==null)?"Failed ":pair.toString()) + " ipv" + ipv);
+                        Log.verb("create pair " + ((pair == null) ? "Failed " : pair.toString()) + " ipv" + ipv);
                     }
                     StunTransaction replyTrans = null;
                     if (checkRoleOk(sbr)) {
                         replyTrans = new StunBindingTransaction(ice, sbr);
                         replyTrans.setCause("inbound");
-                        if(pair != null){
+                        if (pair != null) {
                             pair.recvdInbound(sbr, this, transMan);
                             Log.verb("adding " + replyTrans.toString() + " to do reply");
                         } else {
@@ -388,10 +388,11 @@ public class RTCIceTransport {
     }
 
     public void sendDtlsPkt(byte[] buf, int off, int len) throws IOException {
-        Log.verb("Will send packet on " + selectedPair);
+        Log.verb("Want to send dtls packet on " + (selectedPair == null ? "null" : selectedPair.toString()));
         if (selectedPair != null) {
             selectedPair.sendTo(buf, off, len);
         } else {
+            Log.warn("Null selected pair, can't send non ice packet yet");
             throw new IOException("Null selected pair, can't send non ice packet yet");
         }
     }
@@ -427,10 +428,12 @@ public class RTCIceTransport {
     } 
      */
     public void listPairs() {
-        
+
         StringBuffer list = new StringBuffer();
         synchronized (candidatePairs) {
-            candidatePairs.stream().forEach((p) -> {list.append(p.toString()).append("\n");});
+            candidatePairs.stream().forEach((p) -> {
+                list.append(p.toString()).append("\n");
+            });
         }
         Log.debug(list.toString());
     }

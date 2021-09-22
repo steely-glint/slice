@@ -16,6 +16,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
@@ -186,7 +187,7 @@ public class SimpleStunClientNio extends StunBindingTransaction {
                         DatagramChannel rdc = (DatagramChannel) k.channel();
                         SocketAddress from = rdc.receive(rec);
                         Log.debug("rec.from is "+from);
-                        rec.flip();
+                        ((Buffer)rec).flip();
                         rcvd = new byte[rec.remaining()];
                         rec.get(rcvd);
                         Log.debug("returning "+rcvd.length);
