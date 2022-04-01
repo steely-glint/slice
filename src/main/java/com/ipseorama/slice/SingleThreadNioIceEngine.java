@@ -64,6 +64,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
         _transM = tm;
         RTCIceTransport transP = tm.getTransport();
         if (transP != null) {
+            Log.verb("we have a transport to work with");
             EventHandler chain = transP.onstatechange;
             transP.onstatechange = (data) -> {
                 if (chain != null) {
@@ -90,6 +91,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
                         break;
                 }
             };
+        } else {
+            throw new java.lang.IllegalStateException("Ice engine must have a transport");
         }
         
         if ((_selector == null) || (_transM == null)) {
