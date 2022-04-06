@@ -21,6 +21,7 @@ import com.ipseorama.slice.stun.StunTransaction;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
 import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.nio.channels.DatagramChannel;
 import java.security.SecureRandom;
@@ -49,7 +50,10 @@ public class RTCIceTransport {
     private long tieBreaker;
     private StunTransactionManager transMan;
     private IceEngine ice;
-
+    private RTCIceCandidatePair inbound;
+    public EventHandler onDtls;
+    public EventHandler onRTP;
+    
     public List<RTCIceCandidate> getRemoteCandidates() {
         return remoteCandidates;
     }
@@ -386,13 +390,20 @@ public class RTCIceTransport {
     public RTCIceTransportState getState() {
         return this.state;
     }
-
+    public void setInbound(RTCIceCandidatePair in){
+        inbound = in;
+    }
     public void sendDtlsPkt(byte[] buf, int off, int len) throws IOException {
-        Log.verb("Want to send dtls packet on " + (selectedPair == null ? "null" : selectedPair.toString()));
-        if (selectedPair != null) {
-            selectedPair.sendTo(buf, off, len);
+        
+        RTCIceCandidatePair outbound = selectedPair;
+        if (outbound == null){
+            outbound = inbound;
+        }
+        Log.verb("Want to send dtls packet on " + (outbound == null ? "null" : outbound.toString()));
+        if (outbound != null) {
+            outbound.sendTo(buf, off, len);
         } else {
-            Log.warn("Null selected pair, can't send non ice packet yet");
+            Log.warn("Null selected/outbound pair, can't send non ice packet yet");
             throw new IOException("Null selected pair, can't send non ice packet yet");
         }
     }
@@ -497,7 +508,46 @@ public class RTCIceTransport {
                 break;
         }
     }
+    
+    /*
+                if (selected != null) {
+                selected.pushDTLS(rec);
+            } else {
 
+                RTCIceCandidatePair pair = transport.findCandiatePair(dgc, far);
+                if (pair != null) {
+                    pair.pushDTLS(rec);
+                    transport.setInbound(pair);
+                    Log.debug("didn't stash DTLS packet - used inbound pair");
+                } else {
+                    Log.debug("No matching pair found ?!?!");
+                    Log.debug("DTLS came in on channel " + dgc.toString() + " far " + far);
+                    _transM.getTransport().listPairs();
+                }
+            
+    */
+
+    public void pushDTLS(byte[] rec) {
+        if (onDtls != null) {
+            RTCDtlsPacket dat = new RTCDtlsPacket();
+            dat.data = rec;
+            onDtls.onEvent(dat);
+        } else {
+            Log.debug("dumping dtls packet - no place to push it.");
+        }
+    }
+
+    public void pushRTP(DatagramPacket dgp) {
+        if (onRTP != null) {
+            RTCRtpPacket dat = new RTCRtpPacket();
+            dat.data = dgp;
+            onRTP.onEvent(dat);
+            Log.verb("fired onEvent srtp packet ");
+        } else {
+            Log.debug("dumping rtp packet - no place to push it.");
+        }
+    }
+    
     public RTCIceCandidatePair findCandiatePair(DatagramChannel dgc, InetSocketAddress far) {
         Optional<RTCIceCandidatePair> cp;
         synchronized (candidatePairs) {

@@ -15,7 +15,6 @@ import com.ipseorama.slice.stun.StunTransaction;
 import com.ipseorama.slice.stun.StunTransactionManager;
 import com.phono.srtplight.Log;
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -34,8 +33,8 @@ public class RTCIceCandidatePair implements RTCEventData {
     private final RTCLocalIceCandidate local;
     private final RTCIceCandidate remote;
     private RTCIceCandidatePairState state;
-    public EventHandler onDtls;
-    public EventHandler onRTP;
+    //public EventHandler onDtls;
+    //public EventHandler onRTP;
     public EventHandler onRevoke;
     public EventHandler onStateChange;
 
@@ -246,9 +245,10 @@ Each candidate pair in the check list has a foundation and a state. The foundati
 
 
      */
+    /*
     public void pushDTLS(byte[] rec) {
         if (onDtls != null) {
-            RTCDtlsPacket dat = new RTCDtlsPacket();
+            RTCDtlsPacket dat = new RTCDtlsPacket(this);
             dat.data = rec;
             onDtls.onEvent(dat);
         } else {
@@ -266,7 +266,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
             Log.debug("dumping rtp packet - no place to push it.");
         }
     }
-
+*/
     public void onRevoke() {
         if (onRevoke != null) {
             onRevoke.onEvent(null);
@@ -320,7 +320,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
             Log.warn("cant send : " + name + " not selected.");
         }
     }
-
+/*
     public void pushDTLSStash() {
         Log.debug("Empty DTLS packet stash of " + packetStash.size() + " on " + this.toString());
         packetStash.forEach((byte[] pkt) -> {
@@ -333,7 +333,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
         packetStash.add(rec);
         Log.debug("Added to DTLS packet stash of " + packetStash.size() + " on " + this.toString());
     }
-
+*/
     public boolean sameAsMe(DatagramChannel c, InetSocketAddress f) {
         /*String err = "";
         if (c == null) {

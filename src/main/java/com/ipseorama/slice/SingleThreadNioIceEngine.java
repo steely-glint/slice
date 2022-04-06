@@ -77,9 +77,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
                         selected = transP.getSelectedCandidatePair();
                         selectedAt = System.currentTimeMillis();
                         _transM.pruneExcept(selected, selectedAt+250); // clear near future stuff too.
-                        removeUnselectedChannels(); // that's not really RFC 
+                        //removeUnselectedChannels(); // that's not really RFC 
                         Log.debug("SELECTED ->> " + selected);
-                        selected.pushDTLSStash();
+                        //selected.pushDTLSStash();
                         break;
                     case CONNECTED:
                         break;
@@ -183,6 +183,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
 
          */
         byte b = rec[0];
+        RTCIceTransport transport = _transM.getTransport();
         if ((b < 2) && (b >= 0)) {
             StunPacket rp = StunPacket.mkStunPacket(rec, miPass, near, _transM);
             rp.setFar(far);
@@ -190,28 +191,26 @@ public class SingleThreadNioIceEngine implements IceEngine {
             Log.verb(StunPacket.hexString(rp.getTid()) + "got packet type " + rp.getClass().getSimpleName() + " from " + far);
             _transM.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
         } else if ((19 < b) && (b < 64)) {
-            Log.debug("push inbound DTLS packet");
-            if (selected != null) {
-                selected.pushDTLS(rec);
-            } else {
-                RTCIceCandidatePair pair = _transM.getTransport().findCandiatePair(dgc, far);
+            if (selected == null) {
+                RTCIceCandidatePair pair = transport.findCandiatePair(dgc, far);
                 if (pair != null) {
-                    pair.stashPacket(rec);
-                    Log.debug("stashed DTLS packet - no selected pair - yet...");
+                    transport.setInbound(pair);
+                    Log.info("didn't stash DTLS packet - used inbound pair "+pair);
                 } else {
-                    Log.debug("No matching pair found ?!?!");
+                    Log.warn("No matching pair found for dtls ?!?!");
                     Log.debug("DTLS came in on channel " + dgc.toString() + " far " + far);
                     _transM.getTransport().listPairs();
                 }
             }
+            transport.pushDTLS(rec);
+            Log.debug("push inbound DTLS packet");
         } else if (b < 0) {
             if (selected != null) {
                 DatagramPacket dgp = new DatagramPacket(new byte[0], 0);
-                
                 dgp.setSocketAddress(far);
                 dgp.setData(rec);
                 dgp.setLength(len);
-                selected.pushRTP(dgp);
+                transport.pushRTP(dgp);
             } else {
                 // strictly this is wrong - we should stack them...
                 Log.debug("dumping RTP packet - no selected pair - yet...");
@@ -386,7 +385,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
         return mtu;
     }
     
-    private void removeUnselectedChannels() {
+    public void removeUnselectedChannels() {
         // this isn't correct webRTC behaviour - but really accepting data on a
         // unselected channels is a mistake.
         DatagramChannel sc = selected.getLocal().getChannel();
