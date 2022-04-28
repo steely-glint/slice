@@ -149,6 +149,11 @@ public class SingleThreadNioIceEngine implements IceEngine {
             RTCIceTransport t = _transM.getTransport();
             if (t != null) {
                 t.disconnectedSelected();
+            } else {
+                Log.debug("no transport. Selected is: "+selected );
+                if (Log.getLevel() >= Log.DEBUG)  {
+                    _transM.listPairs();
+                }
             }
         } catch (SocketException ex) {
             Log.error("Can't set timer in rcv loop");
