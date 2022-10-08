@@ -231,7 +231,7 @@ public class RTCIceTransport {
                         .findFirst();
             }
         } else {
-            Log.info("still gathering...");
+            Log.debug("still gathering...");
         }
         return ((ret != null) && ret.isPresent()) ? ret.get() : null;
     }
@@ -477,7 +477,7 @@ public class RTCIceTransport {
     }
 
     public void disconnectedSelected() {
-        Log.debug("IceTransport disconnected ...because no packets received on " + selectedPair == null ? "" : selectedPair.toString());
+        Log.debug("IceTransport disconnected ...because no packets received on " + ((selectedPair == null) ? "" : selectedPair.toString()));
         this.setState(RTCIceTransportState.DISCONNECTED);
     }
 

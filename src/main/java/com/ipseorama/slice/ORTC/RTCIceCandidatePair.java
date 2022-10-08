@@ -314,6 +314,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
                 ch.write(src);
             } catch (IOException x) {
                 Log.warn("Error sending to " + name);
+                setState(RTCIceCandidatePairState.FAILED);
                 throw x;
             }
         } else {
