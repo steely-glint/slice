@@ -22,6 +22,8 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.security.SecureRandom;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -32,7 +34,13 @@ public class SimpleStunClientNio extends StunBindingTransaction {
 
     public static void main(String[] argv) {
         Log.setLevel(Log.ALL);
-        SimpleStunClientNio me = new SimpleStunClientNio("146.148.121.175", 3478);
+        String host = "146.148.121.175";
+        short port = 3478;
+        if (argv.length == 2){
+            port = Short.parseShort(argv[1]);
+            host = argv[0];
+        }
+        SimpleStunClientNio me = new SimpleStunClientNio(host, port);
         try {
             me.query();
         } catch (Exception ex) {
@@ -88,7 +96,8 @@ public class SimpleStunClientNio extends StunBindingTransaction {
             r_sell = Selector.open();
             s_sell = Selector.open();
 
-            dgc = createDatagramChannel("192.168.0.100");
+            dgc = createDatagramChannel("192.67.4.111");
+            this.setChannel(dgc);
             dgc.register(r_sell, SelectionKey.OP_READ);
             //dgc.register(s_sell, SelectionKey.OP_WRITE);
             stm = new StunTransactionManager();
@@ -100,6 +109,7 @@ public class SimpleStunClientNio extends StunBindingTransaction {
     }
 
     private void query() throws Exception {
+        Map<String, String> miPass= new HashMap();
         this.oncomplete = (RTCEventData e) -> {
             Log.debug("got binding reply - or timeout");
             unanswered = false;
@@ -114,6 +124,7 @@ public class SimpleStunClientNio extends StunBindingTransaction {
         };
         while (unanswered) {
             StunPacket pkt = this.buildOutboundPacket();
+            pkt.setChannel(dgc);
             byte[] outb = pkt.outboundBytes();
 
             int nap = (int) (this.dueTime - System.currentTimeMillis());
@@ -122,7 +133,7 @@ public class SimpleStunClientNio extends StunBindingTransaction {
             }
             byte[] inb = sendAndRecv(outb, nap);
             if (inb != null) {
-                StunPacket recv = StunPacket.mkStunPacket(inb, null, null, stm);
+                StunPacket recv = StunPacket.mkStunPacket(inb, miPass, null, stm);
                 stm.receivedPacket(recv, RTCIceProtocol.UDP, 4);
             }
         }
