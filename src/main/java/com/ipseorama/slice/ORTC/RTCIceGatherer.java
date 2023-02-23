@@ -352,8 +352,18 @@ For incoming connectivity checks that pass validation,
         return ret;
     }
      */
+    Stream<DatagramChannel> getChannelsForReflex() {
+        Stream<DatagramChannel> nret = _localCandidates.stream().filter((RTCIceCandidate l) -> {
+            return l.getIpVersion() == 4;
+        }).map((RTCLocalIceCandidate las) -> {
+            return las.getChannel();
+        });
+        return nret;
+    }
+
     DatagramChannel getChannelForReflex() throws IOException {
         DatagramChannel ret = null;
+
         Optional<RTCLocalIceCandidate> lad = _localCandidates.stream().filter((RTCIceCandidate l) -> {
             return l.getIpVersion() == 4;
         }).findFirst();
@@ -361,6 +371,7 @@ For incoming connectivity checks that pass validation,
             ret = lad.get().getChannel();
             Log.debug("reusing local candidate channel for STUN");
         }
+
         if (ret == null) {
             ret = createDatagramChannel("0.0.0.0");
             ret.register(_selector, SelectionKey.OP_READ);
@@ -371,96 +382,108 @@ For incoming connectivity checks that pass validation,
     }
 
     private void gatherReflex(List<RTCIceServer> servers) {
-        try {
-            DatagramChannel reflexC = getChannelForReflex();
-            servers.stream().forEach(
-                    (RTCIceServer s) -> {
-                        Stream<String> stuns = s.urls.stream().map(
-                                (URI u) -> {
-                                    String stun = "stun:";
-                                    String us = u.toASCIIString();
-                                    String hnp = null;
-                                    Log.verb("checking uri " + us);
+        //DatagramChannel reflexC = getChannelForReflex();
+        _localCandidates.stream().filter((RTCIceCandidate l) -> {
+            Log.debug("local candidate is "+l);
+            return l.getIpVersion() == 4;
+        }).map((RTCLocalIceCandidate las) -> {
+            Log.debug("local v4 candidate is "+las);
+            return las.getChannel();
+        }).forEach((DatagramChannel reflexC) -> {
+            try {
+            Log.debug("trying reflex channel "+ reflexC.getLocalAddress().toString());
+            } catch (Exception x){};
+            servers.stream().forEach((RTCIceServer s) -> {
+                Log.debug("trying ICE server "+ s.toString());
+                Stream<String> stuns = s.urls.stream().map(
+                        (URI u) -> {
+                            String stun = "stun:";
+                            String us = u.toASCIIString();
+                            String hnp = null;
+                            Log.verb("checking uri " + us);
 
-                                    if (us.toLowerCase().startsWith(stun)) {
-                                        hnp = us.substring(stun.length());
-                                        Log.verb("stun host " + hnp);
+                            if (us.toLowerCase().startsWith(stun)) {
+                                hnp = us.substring(stun.length());
+                                Log.verb("stun host " + hnp);
+                            }
+                            return hnp;
+                        }
+                ).filter((String host) -> {
+                    Log.verb("stunhost is " + host);
+                    return host != null;
+                });
+                stuns.forEach((String ss) -> {
+                    Log.debug("trying stun server "+ ss.toString());
+
+                    String bits[] = ss.split(":");
+                    String host = null;
+                    int port = 3478;
+                    if (bits.length == 2) {
+                        host = bits[0];
+                        port = Integer.parseInt(bits[1]);
+                    }
+                    if (bits.length == 1) {
+                        host = bits[0];
+                    }
+                    if (host != null) {
+                        StunBindingTransaction sbt = new StunBindingTransaction(_ice, host, port);
+                        sbt.setCause("outbound gather");
+                        sbt.setChannel(reflexC);
+
+                        sbt.oncomplete = (RTCEventData e) -> {
+                            Log.debug("got binding reply - or timeout");
+                            if (e instanceof RTCTimeoutEvent) {
+                                Log.debug("got binding timeout on "+sbt.toString());
+                            }
+                            if (e instanceof StunBindingTransaction) {
+
+                                StunBindingTransaction st = (StunBindingTransaction) e;
+                                InetSocketAddress ref = st.getReflex();
+                                
+                                if (ref != null) {
+                                    RTCIceCandidateType type = RTCIceCandidateType.SRFLX;
+                                    RTCIceProtocol prot = RTCIceProtocol.UDP;
+                                    InetAddress raddr = reflexC.socket().getLocalAddress();
+                                    char rport = (char) reflexC.socket().getLocalPort();
+                                    Log.debug("got stun reply on "+reflexC.socket()+ " from "+st.getFar());
+                                    String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
+                                    long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
+                                    RTCLocalIceCandidate rcand = new RTCLocalIceReflexCandidate(foundation,
+                                            priority,
+                                            ref.getAddress().getHostAddress(),
+                                            prot,
+                                            (char) ref.getPort(),
+                                            type,
+                                            null, reflexC);
+
+                                    rcand.setRelatedAddress(raddr.getHostAddress());
+                                    rcand.setRelatedPort(rport);
+                                    if (ref.getAddress() instanceof java.net.Inet4Address) {
+                                        rcand.setIpVersion(4);
                                     }
-                                    return hnp;
+                                    try {
+                                        InetSocketAddress l = (InetSocketAddress) reflexC.getLocalAddress();
+                                        rcand.setRelatedAddress(l.getAddress().getHostAddress());
+                                        rcand.setRelatedPort((char) l.getPort());
+                                    } catch (IOException x) {
+                                        Log.warn("reflex candidate without rhost/rport " + x.getMessage());
+                                    }
+                                    addLocalCandidate(rcand); // but don't pair it.
+                                } else {
+                                    Log.debug("already have ref ");
                                 }
-                        ).filter((String host) -> {
-                            Log.verb("stunhost is " + host);
-                            return host != null;
-                        });
-                        stuns.forEach((String ss) -> {
-                            String bits[] = ss.split(":");
-                            String host = null;
-                            int port = 3478;
-                            if (bits.length == 2) {
-                                host = bits[0];
-                                port = Integer.parseInt(bits[1]);
                             }
-                            if (bits.length == 1) {
-                                host = bits[0];
+                            _stm.removeComplete();
+                            if (_stm.size() == 0) {
+                                setState(RTCIceGathererState.COMPLETE);
                             }
-                            if (host != null) {
-                                StunBindingTransaction sbt = new StunBindingTransaction(_ice, host, port);
-                                sbt.setCause("outbound gather");
-                                sbt.setChannel(reflexC);
+                        };
+                        _stm.addTransaction(sbt);
+                    }
+                });
+            });
+        });
 
-                                sbt.oncomplete = (RTCEventData e) -> {
-                                    Log.debug("got binding reply - or timeout");
-                                    if (e instanceof RTCTimeoutEvent) {
-                                        Log.debug("got binding timeout");
-                                    }
-                                    if (e instanceof StunBindingTransaction) {
-
-                                        StunBindingTransaction st = (StunBindingTransaction) e;
-                                        InetSocketAddress ref = st.getReflex();
-
-                                        if (ref != null) {
-                                            RTCIceCandidateType type = RTCIceCandidateType.SRFLX;
-                                            RTCIceProtocol prot = RTCIceProtocol.UDP;
-                                            InetAddress raddr = reflexC.socket().getLocalAddress();
-                                            char rport = (char) reflexC.socket().getLocalPort();
-
-                                            String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
-                                            long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
-                                            RTCLocalIceCandidate rcand = new RTCLocalIceReflexCandidate(foundation,
-                                                    priority,
-                                                    ref.getAddress().getHostAddress(),
-                                                    prot,
-                                                    (char) ref.getPort(),
-                                                    type,
-                                                    null, reflexC);
-                                            
-                                            rcand.setRelatedAddress(raddr.getHostAddress());
-                                            rcand.setRelatedPort(rport);
-                                            if (ref.getAddress() instanceof java.net.Inet4Address) {
-                                                rcand.setIpVersion(4);
-                                            }
-                                            try {
-                                                InetSocketAddress l = (InetSocketAddress) reflexC.getLocalAddress();
-                                                rcand.setRelatedAddress(l.getAddress().getHostAddress());
-                                                rcand.setRelatedPort((char) l.getPort());
-                                            } catch (IOException x) {
-                                                Log.warn("reflex candidate without rhost/rport " + x.getMessage());
-                                            }
-                                            addLocalCandidate(rcand); // but don't pair it.
-                                        }
-                                    }
-                                    _stm.removeComplete();
-                                    if (_stm.size() == 0) {
-                                        setState(RTCIceGathererState.COMPLETE);
-                                    }
-                                };
-                                _stm.addTransaction(sbt);
-                            }
-                        });
-                    });
-        } catch (IOException x) {
-
-        }
     }
 
     private void gatherRelay(List<RTCIceServer> servers) {
