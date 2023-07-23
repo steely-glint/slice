@@ -53,7 +53,7 @@ public class RTCIceTransport {
     private RTCIceCandidatePair inbound;
     public EventHandler onDtls;
     public EventHandler onRTP;
-    
+
     public List<RTCIceCandidate> getRemoteCandidates() {
         return remoteCandidates;
     }
@@ -217,21 +217,30 @@ public class RTCIceTransport {
 
     public RTCIceCandidatePair nextCheck(RTCIceCandidatePairState targetState) {
         Optional<RTCIceCandidatePair> ret = null;
-        if (this.iceGatherer.getState() == RTCIceGathererState.COMPLETE) {
-            synchronized (candidatePairs) {
-                ret = candidatePairs.stream()
-                        /*.filter((RTCIceCandidatePair icp) -> {
+        switch (this.iceGatherer.getState()) {
+            case COMPLETE:
+                synchronized (candidatePairs) {
+                    ret = candidatePairs.stream()
+                            /*.filter((RTCIceCandidatePair icp) -> {
                         return !transMan.localIsBusy(icp); // dont list any where there is a transaction in flight, it confuses NAT
                     })*/
-                        .filter((RTCIceCandidatePair icp) -> {
-                            return icp.getState() == targetState;
-                        })
-                        .limit(MAXCHECKS)
-                        .sorted(ordering)
-                        .findFirst();
-            }
-        } else {
-            Log.debug("still gathering...");
+                            .filter((RTCIceCandidatePair icp) -> {
+                                return icp.getState() == targetState;
+                            })
+                            .limit(MAXCHECKS)
+                            .sorted(ordering)
+                            .findFirst();
+                }
+                break;
+            case NEW:
+                Log.debug("gather state NEW");
+                break;
+            case GATHERING:
+                Log.debug("gather state GATHERING");
+                break;
+            case CLOSED:
+                Log.debug("gather state CLOSED");
+                break;
         }
         return ((ret != null) && ret.isPresent()) ? ret.get() : null;
     }
@@ -390,13 +399,15 @@ public class RTCIceTransport {
     public RTCIceTransportState getState() {
         return this.state;
     }
-    public void setInbound(RTCIceCandidatePair in){
+
+    public void setInbound(RTCIceCandidatePair in) {
         inbound = in;
     }
+
     public void sendDtlsPkt(byte[] buf, int off, int len) throws IOException {
-        
+
         RTCIceCandidatePair outbound = selectedPair;
-        if (outbound == null){
+        if (outbound == null) {
             outbound = inbound;
         }
         Log.verb("Want to send dtls packet on " + (outbound == null ? "null" : outbound.toString()));
@@ -508,7 +519,7 @@ public class RTCIceTransport {
                 break;
         }
     }
-    
+
     /*
                 if (selected != null) {
                 selected.pushDTLS(rec);
@@ -525,8 +536,7 @@ public class RTCIceTransport {
                     _transM.getTransport().listPairs();
                 }
             
-    */
-
+     */
     public void pushDTLS(byte[] rec) {
         if (onDtls != null) {
             RTCDtlsPacket dat = new RTCDtlsPacket();
@@ -547,7 +557,7 @@ public class RTCIceTransport {
             Log.debug("dumping rtp packet - no place to push it.");
         }
     }
-    
+
     public RTCIceCandidatePair findCandiatePair(DatagramChannel dgc, InetSocketAddress far) {
         Optional<RTCIceCandidatePair> cp;
         synchronized (candidatePairs) {

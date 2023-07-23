@@ -267,6 +267,8 @@ For incoming connectivity checks that pass validation,
                 break;
             case LOCAL:
                 gatherLocals();
+                Log.debug("Locals only - nothing to wait for...");
+                setState(RTCIceGathererState.COMPLETE);
                 break;
 
         }
@@ -384,17 +386,18 @@ For incoming connectivity checks that pass validation,
     private void gatherReflex(List<RTCIceServer> servers) {
         //DatagramChannel reflexC = getChannelForReflex();
         _localCandidates.stream().filter((RTCIceCandidate l) -> {
-            Log.debug("local candidate is "+l);
+            Log.debug("local candidate is " + l);
             return l.getIpVersion() == 4;
         }).map((RTCLocalIceCandidate las) -> {
-            Log.debug("local v4 candidate is "+las);
+            Log.debug("local v4 candidate is " + las);
             return las.getChannel();
         }).forEach((DatagramChannel reflexC) -> {
             try {
-            Log.debug("trying reflex channel "+ reflexC.getLocalAddress().toString());
-            } catch (Exception x){};
+                Log.debug("trying reflex channel " + reflexC.getLocalAddress().toString());
+            } catch (Exception x) {
+            };
             servers.stream().forEach((RTCIceServer s) -> {
-                Log.debug("trying ICE server "+ s.toString());
+                Log.debug("trying ICE server " + s.toString());
                 Stream<String> stuns = s.urls.stream().map(
                         (URI u) -> {
                             String stun = "stun:";
@@ -413,7 +416,7 @@ For incoming connectivity checks that pass validation,
                     return host != null;
                 });
                 stuns.forEach((String ss) -> {
-                    Log.debug("trying stun server "+ ss.toString());
+                    Log.debug("trying stun server " + ss.toString());
 
                     String bits[] = ss.split(":");
                     String host = null;
@@ -433,19 +436,19 @@ For incoming connectivity checks that pass validation,
                         sbt.oncomplete = (RTCEventData e) -> {
                             Log.debug("got binding reply - or timeout");
                             if (e instanceof RTCTimeoutEvent) {
-                                Log.debug("got binding timeout on "+sbt.toString());
+                                Log.debug("got binding timeout on " + sbt.toString());
                             }
                             if (e instanceof StunBindingTransaction) {
 
                                 StunBindingTransaction st = (StunBindingTransaction) e;
                                 InetSocketAddress ref = st.getReflex();
-                                
+
                                 if (ref != null) {
                                     RTCIceCandidateType type = RTCIceCandidateType.SRFLX;
                                     RTCIceProtocol prot = RTCIceProtocol.UDP;
                                     InetAddress raddr = reflexC.socket().getLocalAddress();
                                     char rport = (char) reflexC.socket().getLocalPort();
-                                    Log.debug("got stun reply on "+reflexC.socket()+ " from "+st.getFar());
+                                    Log.debug("got stun reply on " + reflexC.socket() + " from " + st.getFar());
                                     String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
                                     long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
                                     RTCLocalIceCandidate rcand = new RTCLocalIceReflexCandidate(foundation,
@@ -476,6 +479,8 @@ For incoming connectivity checks that pass validation,
                             _stm.removeComplete();
                             if (_stm.size() == 0) {
                                 setState(RTCIceGathererState.COMPLETE);
+                            } else {
+                                Log.debug(" still have " + _stm.size() + " transactions queued");
                             }
                         };
                         _stm.addTransaction(sbt);
@@ -483,7 +488,10 @@ For incoming connectivity checks that pass validation,
                 });
             });
         });
-
+        if (_stm.size() == 0) {
+            Log.debug("no stun stun transactions from our local addresses ");
+            setState(RTCIceGathererState.COMPLETE);
+        }
     }
 
     private void gatherRelay(List<RTCIceServer> servers) {
