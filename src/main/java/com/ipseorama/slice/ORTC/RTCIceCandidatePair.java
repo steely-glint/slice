@@ -96,6 +96,7 @@ public class RTCIceCandidatePair implements RTCEventData {
             if (this.state == state.NOMINATED) {
                 connectChannel();
             }
+           
             if (this.onStateChange != null) {
                 onStateChange.onEvent(newState);
             }
@@ -366,7 +367,7 @@ Each candidate pair in the check list has a foundation and a state. The foundati
         }
         boolean samesock = this.remote.sameSocketAddress(f);
         if (!samesock) {
-            Log.debug(name + " far " + f + " != " + remote.getIp() + ":" + remote.getPort());
+            Log.debug(name + " far " + f + " != " + remote.getIp() + ":" + ((int)remote.getPort()));
         }
         return ((remote != null)
                 && (local != null)

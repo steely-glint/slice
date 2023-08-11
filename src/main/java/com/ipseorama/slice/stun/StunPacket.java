@@ -124,7 +124,7 @@ public class StunPacket {
     static ArrayList<StunAttribute> parseAttributes(ByteBuffer a_frame) {
         ArrayList<StunAttribute> buf = new ArrayList();
         while (a_frame.remaining() >= 4) {
-            int startpos = ((Buffer)a_frame).position() + 20;
+            int startpos = ((Buffer) a_frame).position() + 20;
             char a_type = a_frame.getChar();
             int a_len = a_frame.getChar();
             byte[] val = new byte[a_len];
@@ -150,24 +150,24 @@ public class StunPacket {
     static int putAttributes(ByteBuffer bb, ArrayList<StunAttribute> attributes, byte[] pass) throws NoSuchAlgorithmException, InvalidKeyException, ShortBufferException {
         int len = 0;
         for (StunAttribute a : attributes) {
-            Log.verb("putting attribute " + a.getName() + " at " + ((Buffer)bb).position());
+            Log.verb("putting attribute " + a.getName() + " at " + ((Buffer) bb).position());
             len += a.put(bb);
             bb.putChar(2, (char) len); // update the length 
             if (a.getName() != null) {
                 if (a.getName().equals("MESSAGE-INTEGRITY")) {
                     byte[] mi = calculateMessageIntegrity(pass, bb, false);
-                    int start = ((Buffer)bb).position() - mi.length;
-                    for (int i = start; i < ((Buffer)bb).position(); i++) {
+                    int start = ((Buffer) bb).position() - mi.length;
+                    for (int i = start; i < ((Buffer) bb).position(); i++) {
                         bb.put(i, mi[i - start]);
                     }
                 }
                 if (a.getName().equals("FINGERPRINT")) {
-                    byte[] rawpack = new byte[((Buffer)bb).position()];
+                    byte[] rawpack = new byte[((Buffer) bb).position()];
                     for (int i = 0; i < rawpack.length; i++) {
                         rawpack[i] = bb.get(i);
                     }
                     int fp = calculateFingerprint(rawpack);
-                    bb.putInt(((Buffer)bb).position() - 4, fp);
+                    bb.putInt(((Buffer) bb).position() - 4, fp);
                 }
             }
         }
@@ -384,7 +384,7 @@ public class StunPacket {
     private static void validatePacket(ArrayList<StunAttribute> attributes, Integer fingerprint, byte[] messageIntegrity) throws FingerPrintException, MessageIntegrityException {
         boolean fpOk = false;
         boolean miOk = false;
-
+        byte mi[] = {};
         for (StunAttribute a : attributes) {
             String name = a.getName();
             Log.verb("attribute " + name);
@@ -395,7 +395,7 @@ public class StunPacket {
                 }
                 if (name.equals("MESSAGE-INTEGRITY") && (messageIntegrity != null)) {
                     Log.verb("Checking mi");
-                    byte mi[] = a.getBytes();
+                    mi = a.getBytes();
                     if (mi.length == messageIntegrity.length) {
                         int i = 0;
                         for (; i < mi.length; i++) {
@@ -415,6 +415,22 @@ public class StunPacket {
             throw new FingerPrintException();
         }
         if (!miOk && messageIntegrity != null) { // ie we were expecting a message integrity check 
+            if (Log.getLevel() >= Log.DEBUG) {
+                StringBuffer a = new StringBuffer();
+                for (byte m : mi) {
+                    if (((0xff)&m) < 16) a.append("0");
+                    a.append(Integer.toHexString((0xff) & m));
+                }
+                StringBuffer b = new StringBuffer();
+                for (byte m : messageIntegrity) {
+                    if (((0xff)&m) < 16) a.append("0");
+                    b.append(Integer.toHexString((0xff) & m));
+                }
+                Log.debug("Message integrity mismatch:");
+                Log.debug("\t"+a);
+                Log.debug("\t"+b);
+
+            }
             throw new MessageIntegrityException("Expected a MessageIntegrity but it didn't checkout...");
         }
     }
@@ -499,9 +515,12 @@ public class StunPacket {
     public String toString() {
         return "Stun pkt " + this.getClass().getSimpleName() + " far =" + this._far + " near =" + this._near;
     }
-    public String listAttribs(){
+
+    public String listAttribs() {
         StringBuffer retB = new StringBuffer();
-        this._attributes.forEach((a) -> { retB.append(a.toString(_tid)).append(" ");} );
+        this._attributes.forEach((a) -> {
+            retB.append(a.toString(_tid)).append(" ");
+        });
         return retB.toString();
     }
 }
