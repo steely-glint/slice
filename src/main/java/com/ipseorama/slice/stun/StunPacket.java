@@ -331,7 +331,7 @@ public class StunPacket {
                                         });
                                     }
                                 }
-                                throw new MessageIntegrityException("No pass available...", ret);
+                                //throw new MessageIntegrityException("No pass available...", ret);
                             }
                         }
                         try {
