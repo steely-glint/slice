@@ -349,6 +349,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
                                 } catch (java.net.PortUnreachableException pux) {
                                     Log.warn("port unreachable for outbound -> close()" + sp.getFar());
                                     ch.close();
+                                } catch (java.net.NoRouteToHostException pux) {
+                                    Log.warn("no route to host for outbound -> close()" + sp.getFar());
+                                    ch.close();
                                 }
                             } else {
                                 Log.debug("chanel is closed " + ch);
