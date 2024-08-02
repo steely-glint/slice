@@ -200,7 +200,7 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 RTCIceCandidatePair pair = transport.findCandiatePair(dgc, far);
                 if (pair != null) {
                     transport.setInbound(pair);
-                    Log.info("didn't stash DTLS packet - used inbound pair " + pair);
+                    Log.debug("didn't stash DTLS packet - used inbound pair " + pair);
                 } else {
                     Log.warn("No matching pair found for dtls ?!?!");
                     Log.debug("DTLS came in on channel " + dgc.toString() + " far " + far);

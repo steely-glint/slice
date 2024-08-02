@@ -208,7 +208,8 @@ public class StunTransactionManager {
             Log.debug("----> active check " + sa);
             return (sa instanceof IceStunBindingTransaction)
                     && ((((IceStunBindingTransaction) sa).getPair()) == sp)
-                    && !sa.isComplete();
+                    && !sa.isComplete()
+                    ;
         });
 
     }
