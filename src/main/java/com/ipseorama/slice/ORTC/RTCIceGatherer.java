@@ -102,122 +102,130 @@ For incoming connectivity checks that pass validation,
         // which will at least work if we are in pure v6
         try {
             Enumeration nifs = NetworkInterface.getNetworkInterfaces();
+
             int i = 0;
             int mtu = 1400;
             int lpref = Character.MAX_VALUE;
             while (nifs.hasMoreElements()) {
-                NetworkInterface ni = (NetworkInterface) nifs.nextElement();
-                byte[] hw = ni.getHardwareAddress();
-                Log.debug("Adding interface: " + ni.getDisplayName());
-                if (ni.isLoopback()) {
-                    Log.debug("Skipping loopback " + ni.getDisplayName());
-                } else if (ni.isUp()) {
-                    mtu = ni.getMTU();
-                    Enumeration ipads = ni.getInetAddresses();
-                    List<InterfaceAddress> iads = ni.getInterfaceAddresses();
-                    Inet4Address home = null;
-                    Inet6Address home6 = null;
-                    while (ipads.hasMoreElements()) {
-                        InetAddress ipad = (InetAddress) ipads.nextElement();
-                        if (!ipad.isLoopbackAddress()) {
-                            if (ipad instanceof Inet4Address) {
-                                if (home == null) {
-                                    home = (Inet4Address) ipad;
-                                    Log.debug("Using address: " + ipad.getHostAddress());
-                                } else {
-                                    Log.debug("Not Using address: " + ipad.getHostAddress());
+                try {
+                    NetworkInterface ni = (NetworkInterface) nifs.nextElement();
+                    byte[] hw = ni.getHardwareAddress();
+                    Log.debug("Adding interface: " + ni.getDisplayName());
+                    if (ni.isLoopback()) {
+                        Log.debug("Skipping loopback " + ni.getDisplayName());
+                    } else if (ni.isUp()) {
+                        mtu = ni.getMTU();
+                        Enumeration ipads = ni.getInetAddresses();
+                        List<InterfaceAddress> iads = ni.getInterfaceAddresses();
+                        Inet4Address home = null;
+                        Inet6Address home6 = null;
+                        while (ipads.hasMoreElements()) {
+                            InetAddress ipad = (InetAddress) ipads.nextElement();
+                            if (!ipad.isLoopbackAddress()) {
+                                if (ipad instanceof Inet4Address) {
+                                    if (home == null) {
+                                        home = (Inet4Address) ipad;
+                                        Log.debug("Using address: " + ipad.getHostAddress());
+                                    } else {
+                                        Log.debug("Not Using address: " + ipad.getHostAddress());
+                                    }
+                                }
+                                if (ipad instanceof Inet6Address) {
+                                    if (ipad.isLinkLocalAddress()) {
+                                        Log.debug("Not Using link local address: " + ipad.getHostAddress());
+                                        continue;
+                                    }
+                                    if (home6 == null) {
+                                        home6 = (Inet6Address) ipad;
+                                        Log.debug("Using address (for now) : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                    } else if (howMacBased(home6.getAddress(), hw) > howMacBased(ipad.getAddress(), hw)) {
+                                        home6 = (Inet6Address) ipad;
+                                        Log.debug("Prefer using address : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                    } else {
+                                        Log.debug("Don't prefer Using address: " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
+                                    }
+
                                 }
                             }
-                            if (ipad instanceof Inet6Address) {
-                                if (ipad.isLinkLocalAddress()) {
-                                    Log.debug("Not Using link local address: " + ipad.getHostAddress());
-                                    continue;
-                                }
-                                if (home6 == null) {
-                                    home6 = (Inet6Address) ipad;
-                                    Log.debug("Using address (for now) : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                } else if (howMacBased(home6.getAddress(), hw) > howMacBased(ipad.getAddress(), hw)) {
-                                    home6 = (Inet6Address) ipad;
-                                    Log.debug("Prefer using address : " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                } else {
-                                    Log.debug("Don't prefer Using address: " + ipad.getHostAddress() + " " + howMacBased(ipad.getAddress(), hw));
-                                }
-
-                            }
                         }
-                    }
-                    localAdd.append("\t\t" + ni.getDisplayName() + " ");
-                    if (home6 != null) {
+                        localAdd.append("\t\t" + ni.getDisplayName() + " ");
+                        if (home6 != null) {
 
-                        localAdd.append(" [" + home6.getHostAddress() + "]");
-                        String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home6, null, RTCIceProtocol.UDP);
-                        long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
-                        lpref -= 6;
-                        String sixad = home6.getHostAddress();
-                        Log.debug("os sixad is " + sixad);
-                        if (sixad.contains("%")) {
-                            String bits[] = sixad.split("%");
-                            sixad = bits[0];
-                            Log.debug("new sixad is " + sixad);
-                        }
-                        try {
-                            DatagramChannel channel = createDatagramChannel(sixad);
-                            int port = channel.socket().getLocalPort();
-                            RTCLocalIceCandidate cand6 = new RTCLocalIceCandidate(foundation,
-                                    priority,
-                                    sixad,
-                                    RTCIceProtocol.UDP,
-                                    (char) port,
-                                    RTCIceCandidateType.HOST,
-                                    null, channel);
-                            cand6.setMTU(mtu);
-
-                            addLocalCandidate(cand6);
-
-                            channel.register(_selector, SelectionKey.OP_READ, (Object) cand6);
-                        } catch (IOException x) {
-                            Log.error("Candidate creation failed for " + home6);
-                        }
-
-                    }
-                    if (home != null) {
-                        String fourad = home.getHostAddress();
-                        try {
-                            DatagramChannel channel = createDatagramChannel(fourad);
-                            localAdd.append(fourad).append('\n');
-                            String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
+                            localAdd.append(" [" + home6.getHostAddress() + "]");
+                            String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home6, null, RTCIceProtocol.UDP);
                             long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
-                            lpref -= 4;
-                            int port = channel.socket().getLocalPort();
+                            lpref -= 6;
+                            String sixad = home6.getHostAddress();
+                            Log.debug("os sixad is " + sixad);
+                            if (sixad.contains("%")) {
+                                String bits[] = sixad.split("%");
+                                sixad = bits[0];
+                                Log.debug("new sixad is " + sixad);
+                            }
+                            try {
+                                DatagramChannel channel = createDatagramChannel(sixad);
+                                int port = channel.socket().getLocalPort();
+                                RTCLocalIceCandidate cand6 = new RTCLocalIceCandidate(foundation,
+                                        priority,
+                                        sixad,
+                                        RTCIceProtocol.UDP,
+                                        (char) port,
+                                        RTCIceCandidateType.HOST,
+                                        null, channel);
+                                cand6.setMTU(mtu);
 
-                            RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
-                                    priority,
-                                    fourad,
-                                    RTCIceProtocol.UDP,
-                                    (char) port,
-                                    RTCIceCandidateType.HOST,
-                                    null,
-                                    channel);
-                            cand4.setIpVersion(4);
-                            cand4.setMTU(mtu);
+                                addLocalCandidate(cand6);
 
-                            addLocalCandidate(cand4);
-                            channel.register(_selector, SelectionKey.OP_READ, (Object) cand4);
-                        } catch (IOException x) {
-                            Log.error("Candidate creation failed for " + fourad);
+                                channel.register(_selector, SelectionKey.OP_READ, (Object) cand6);
+                            } catch (IOException x) {
+                                Log.error("Candidate creation failed for " + home6);
+                            }
+
                         }
-                    }
+                        if (home != null) {
+                            String fourad = home.getHostAddress();
+                            try {
+                                DatagramChannel channel = createDatagramChannel(fourad);
+                                localAdd.append(fourad).append('\n');
+                                String foundation = RTCIceCandidate.calcFoundation(RTCIceCandidateType.HOST, home, null, RTCIceProtocol.UDP);
+                                long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) lpref, RTCIceComponent.RTP); // to do
+                                lpref -= 4;
+                                int port = channel.socket().getLocalPort();
 
-                } else {
-                    Log.debug("Ignoring interface: " + ni.getDisplayName());
+                                RTCLocalIceCandidate cand4 = new RTCLocalIceCandidate(foundation,
+                                        priority,
+                                        fourad,
+                                        RTCIceProtocol.UDP,
+                                        (char) port,
+                                        RTCIceCandidateType.HOST,
+                                        null,
+                                        channel);
+                                cand4.setIpVersion(4);
+                                cand4.setMTU(mtu);
+
+                                addLocalCandidate(cand4);
+                                channel.register(_selector, SelectionKey.OP_READ, (Object) cand4);
+                            } catch (IOException x) {
+                                Log.error("Candidate creation failed for " + fourad);
+                            }
+                        }
+                    } else {
+                        Log.debug("Ignoring interface: " + ni.getDisplayName());
+                    }
+                } catch (Throwable x) {
+                    Log.warn("interface problem  " + x);
+                    if (Log.getLevel() > Log.DEBUG) {
+                        x.printStackTrace();
+                    }
                 }
             }
-        } catch (SocketException x) {
-            Log.warn("socket problem  " + x);
+        } catch (Exception x) {
+            Log.warn("interface problem  " + x);
             if (Log.getLevel() > Log.DEBUG) {
                 x.printStackTrace();
             }
         }
+
         Log.debug("Local addresses: " + localAdd);
         for (RTCIceCandidate c : _localCandidates) {
             Log.debug(c.toSDP(_component));
