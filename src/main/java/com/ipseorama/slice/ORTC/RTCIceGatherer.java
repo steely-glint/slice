@@ -110,6 +110,7 @@ For incoming connectivity checks that pass validation,
                 try {
                     NetworkInterface ni = (NetworkInterface) nifs.nextElement();
                     byte[] hw = ni.getHardwareAddress();
+                    if (hw == null )  { hw = new byte[4];}
                     Log.debug("Adding interface: " + ni.getDisplayName());
                     if (ni.isLoopback()) {
                         Log.debug("Skipping loopback " + ni.getDisplayName());
