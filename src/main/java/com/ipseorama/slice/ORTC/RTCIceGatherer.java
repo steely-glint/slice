@@ -459,7 +459,7 @@ For incoming connectivity checks that pass validation,
                                     char rport = (char) reflexC.socket().getLocalPort();
                                     Log.debug("got stun reply on " + reflexC.socket() + " from " + st.getFar());
                                     String foundation = RTCIceCandidate.calcFoundation(type, raddr, st.getFar().getAddress(), prot);
-                                    long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.HOST, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
+                                    long priority = RTCIceCandidate.calcPriority(RTCIceCandidateType.SRFLX, (char) (ref.getPort() / 2), RTCIceComponent.RTP);
                                     RTCLocalIceCandidate rcand = new RTCLocalIceReflexCandidate(foundation,
                                             priority,
                                             ref.getAddress().getHostAddress(),

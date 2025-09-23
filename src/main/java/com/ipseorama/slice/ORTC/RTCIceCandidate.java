@@ -92,6 +92,7 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
      * @param priority the priority to set
      */
     public void setPriority(long priority) {
+        Log.info("set priority to "+priority+" for "+this.toString());
         this.priority = priority;
     }
 
@@ -261,21 +262,21 @@ public class RTCIceCandidate implements RTCIceGatherCandidate, RTCEventData {
         int ctv = 0;
         switch (ctype) {
             case HOST:
-                ctv = 126;
-                break;
-            case SRFLX:
                 ctv = 100;
                 break;
+            case SRFLX:
+                ctv = 120; // customize these - SRFLX is the most likely to be useful if it is different from HOST
+                break;
             case PRFLX:
-                ctv = 110;
+                ctv = 110; // customize these - SRFLX is the quite likely to be useful if it is different from HOST
                 break;
             case RELAY:
                 ctv = 0;
                 break;
         }
-        int priority = (2 ^ 24) * (ctv)
-                + (2 ^ 8) * (localpref)
-                + (2 ^ 0) * (256 - comp.ordinal());
+        int priority =(ctv << 24)
+                + (localpref << 8)
+                + (256 - comp.ordinal());
         return priority;
 
     }
