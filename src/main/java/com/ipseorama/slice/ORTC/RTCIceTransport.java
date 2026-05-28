@@ -12,6 +12,7 @@ import com.ipseorama.slice.ORTC.enums.RTCIceRole;
 import com.ipseorama.slice.ORTC.enums.RTCIceComponent;
 import com.ipseorama.slice.ORTC.enums.RTCIceGathererState;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
+import com.ipseorama.slice.SingleThreadNioIceEngine;
 import com.ipseorama.slice.stun.StunAttribute;
 import com.ipseorama.slice.stun.StunBindingRequest;
 import com.ipseorama.slice.stun.StunBindingTransaction;
@@ -414,8 +415,12 @@ public class RTCIceTransport {
         if (outbound != null) {
             outbound.sendTo(buf, off, len);
         } else {
-            Log.warn("Null selected/outbound pair, can't send non ice packet yet");
-            throw new IOException("Null selected pair, can't send non ice packet yet");
+            if (ice instanceof SingleThreadNioIceEngine){
+                ((SingleThreadNioIceEngine)ice).addOutBoundDTLS(buf,off,len);
+            } else {
+                Log.warn("Null selected/outbound pair, can't send non ice (DTLS) packet yet");
+            }
+            //throw new IOException("Null selected pair, can't send non ice packet yet");
         }
     }
 

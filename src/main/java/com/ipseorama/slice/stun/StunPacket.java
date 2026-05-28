@@ -278,7 +278,7 @@ public class StunPacket {
         return ret;
     }
 
-    StunAttribute getAttributeByName(String aname) {
+    public StunAttribute getAttributeByName(String aname) {
         StunAttribute ret = null;
         for (StunAttribute a : this._attributes) {
             if ((a.getName() != null) && (a.getName().equals(aname))) {
@@ -522,5 +522,15 @@ public class StunPacket {
             retB.append(a.toString(_tid)).append(" ");
         });
         return retB.toString();
+    }
+
+    public void addSpedAttribute(String aname, byte[] pk) {
+        StunAttribute a = new StunAttribute(aname);
+        a.setBytes(pk);
+        if (this._attributes !=null){
+            this._attributes.addFirst(a);
+        } else {
+            Log.warn("not adding DTLS sped to "+this);
+        }
     }
 }

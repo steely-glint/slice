@@ -11,6 +11,9 @@ import com.ipseorama.slice.ORTC.RTCIceTransport;
 import com.ipseorama.slice.ORTC.RTCLocalIceCandidate;
 import com.ipseorama.slice.ORTC.enums.RTCIceProtocol;
 import com.ipseorama.slice.ORTC.enums.RTCIceTransportState;
+import com.ipseorama.slice.stun.StunAttribute;
+import com.ipseorama.slice.stun.StunBindingRequest;
+import com.ipseorama.slice.stun.StunBindingResponse;
 import com.ipseorama.slice.stun.StunBindingTransaction;
 import com.ipseorama.slice.stun.StunPacket;
 import com.ipseorama.slice.stun.StunPacketException;
@@ -25,12 +28,14 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.zip.CRC32;
 
 /**
  *
@@ -48,13 +53,17 @@ public class SingleThreadNioIceEngine implements IceEngine {
     static int POLL = 1000;
     static int MAXSILENCE = 40;
     static int Ta = 5;
-    private int mtu = StunPacket.MTU;
-    private Map<String, String> miPass = new HashMap();
+    private final int mtu = StunPacket.MTU;
+    private final Map<String, String> miPass = new HashMap();
     long nextAvailableTime;
     private RTCIceCandidatePair selected;
     private Long selectedAt = null;
     static int sliceid = 0;
+    private boolean doSped;
+    private final ArrayList<Integer> spedAckList = new ArrayList();
+    private final ArrayList<byte[]> outboundDTLS = new ArrayList();
 
+    @Override
     public synchronized void start(Selector s, StunTransactionManager tm) {
         if (_started) {
             throw new java.lang.IllegalStateException("Can't start a Threaded Ice engine more than once.");
@@ -195,6 +204,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
             rp.setChannel(dgc);
             Log.verb(StunPacket.hexString(rp.getTid()) + "got packet type " + rp.getClass().getSimpleName() + " from " + far);
             _transM.receivedPacket(rp, RTCIceProtocol.UDP, ipv);
+            if (doSped) {
+                inboundSped(rp, transport);
+            }
         } else if ((19 < b) && (b < 64)) {
             if (selected == null) {
                 RTCIceCandidatePair pair = transport.findCandiatePair(dgc, far);
@@ -333,6 +345,9 @@ public class SingleThreadNioIceEngine implements IceEngine {
             if (tos != null) {
                 for (StunPacket sp : tos) {
                     if (sp != null) {
+                        if (doSped) {
+                            outboundSped(sp);
+                        }
                         byte o[] = sp.outboundBytes(miPass);
                         DatagramChannel ch = sp.getChannel();
                         InetSocketAddress far = sp.getFar();
@@ -415,6 +430,109 @@ public class SingleThreadNioIceEngine implements IceEngine {
                 Log.debug("keeping selected channel " + kc);
             }
         });
+    }
+
+    public void doSped(boolean b) {
+        this.doSped = b;
+    }
+
+    private int crcOf(byte[] data) {
+        byte b[] = new byte[4];
+        CRC32 crc = new CRC32();
+        crc.update(data);
+        return (int) crc.getValue();
+    }
+
+    /*
+    3.3.2.1. DTLS-IN-STUN-DATA
+
+This attribute contains one DTLS handshake packet, or is empty to indicate SPED support when no DTLS packet is being embedded.
+While SPED is active, this attribute MUST be present in every STUN Binding Request or Response sent by a SPED-capable agent.
+The value portion of this attribute is variable length and consists of one DTLS handshake packet from a DTLS flight, as described in Section 5.1 of [RFC9147] or Section 4.2 of [RFC6347].
+As noted, if the attribute length is not a multiple of 4, padding must be added.
+If the value portion of this attribute is empty, it indicates SPED support and that no DTLS packet is being embedded in that STUN message. An empty value MUST NOT be injected into the DTLS layer.
+If the value portion of this attribute is non-empty but the first byte is not DTLS, i.e. between 20 and 63 inclusive as described in Section 3 of [RFC9443], the attribute SHOULD be silently discarded.
+
+    3.3.2.2. DTLS-IN-STUN-ACK
+
+This attribute contains acknowledgements of received DTLS-IN-STUN-DATA packets in the order they were received.
+The attribute can be present in either a STUN Binding Request or Response.
+The attribute is variable length and contains a list of uint32 entries, where each entry is the computed CRC-32 of a received DTLS-IN-STUN-DATA attribute value, i.e. a DTLS handshake packet, ignoring padding.
+Implementations SHOULD cap the number of uint32 entries included in this attribute. A cap of 4 entries is RECOMMENDED, which bounds the attribute size while still covering all known handshake cases.
+The attribute can be empty, i.e. the length of the list of uint32 values can be 0.
+     */
+    private void inboundSped(StunPacket rp, RTCIceTransport transport) {
+        if (rp.hasAttribute("DTLS-IN-STUN-DATA")) {
+            StunAttribute dataA = rp.getAttributeByName("DTLS-IN-STUN-DATA");
+            byte[] data = dataA.getBytes();
+            if ((data.length > 0) && ((data[0] >= 20) && (data[0] <= 63))) {
+                Integer acc = crcOf(data);
+                boolean push = false;
+                synchronized (spedAckList) {
+                    if (!spedAckList.contains(acc)) {
+                        spedAckList.add(acc);
+                        push = true;
+                    }
+                }
+                if (push) {
+                    Log.debug("Pushing sped data to DTLS " + acc);
+                    transport.pushDTLS(data);
+                } else {
+                    Log.debug("Not Pushing sped data to DTLS " + acc);
+                }
+            } else {
+                Log.debug("not Pushing sped data to DTLS " + data.length);
+            }
+        }
+        if (rp.hasAttribute("DTLS-IN-STUN-ACK")) {
+            StunAttribute dataA = rp.getAttributeByName("DTLS-IN-STUN-ACK");
+            byte[] data = dataA.getBytes();
+            int len = data.length / 4;
+            ByteBuffer crcs = ByteBuffer.wrap(data);
+            for (int i = 0; i < len; i++) {
+                long crc = crcs.getInt();
+                Log.debug("far saw sped DTLS " + crc);
+                synchronized (outboundDTLS) {
+                    this.outboundDTLS.removeIf((bo) -> {
+                        int lcrc = crcOf(bo);
+                        boolean res = lcrc == crc;
+                        Log.verb("sped DTLS checking ack against " + lcrc + " remove ->" + res);
+                        return res;
+                    });
+                }
+            }
+        }
+    }
+
+    // how to do flights?
+    
+    private void outboundSped(StunPacket sp) {
+        if ((sp instanceof StunBindingRequest) || (sp instanceof StunBindingResponse)) {
+            byte[] pk;
+            synchronized (outboundDTLS) {
+                pk = outboundDTLS.isEmpty() ? new byte[0] : outboundDTLS.getFirst();
+            }
+            ByteBuffer acks;
+            synchronized (spedAckList) {
+                acks = ByteBuffer.allocate(spedAckList.size() * 4);
+                spedAckList.forEach((l) -> acks.putInt((int) (long) l));
+            }
+            sp.addSpedAttribute("DTLS-IN-STUN-DATA", pk);
+            sp.addSpedAttribute("DTLS-IN-STUN-ACK", acks.array());
+            Log.debug("Added adding outbound DTLS sped to " + sp);
+
+        } else {
+            Log.debug("Not adding DTLS sped to " + sp);
+        }
+    }
+
+    public void addOutBoundDTLS(byte[] buf, int off, int len) {
+        byte[] b = new byte[len];
+        System.arraycopy(buf, off, b, 0, len);
+        Log.debug("sped DTLS enqueued " + crcOf(b));
+        synchronized (outboundDTLS) {
+            outboundDTLS.add(b);
+        }
     }
 
 }

@@ -80,8 +80,11 @@ public class StunAttribute {
                     new SimpleEntry<>(0x802C, "OTHER-ADDRESS"), //[RFC5780]
                     new SimpleEntry<>(0x802D, "ECN-CHECK STUN"), //[RFC6679]
                     //0x802E-0xBFFF,Unassigned,
-                    new SimpleEntry<>(0xC000, "CISCO-STUN-FLOWDATA" //[Dan_Wing]
+                    new SimpleEntry<>(0xC000, "CISCO-STUN-FLOWDATA"), //[Dan_Wing]
                     //0xC001-0xFFFF,Unassigned,
+                    new SimpleEntry<>(0xC070, "DTLS-IN-STUN-DATA"), //[SPED]
+                    new SimpleEntry<>(0xC071, "DTLS-IN-STUN-ACK"), //[SPED]
+                    new SimpleEntry<>(0xC057, "GOOGLE-NETWORK-INFO" //[Trixy google]
                     )
             ).collect(Collectors.toMap((e) -> e.getKey(), (e) -> e.getValue())));
     final static Map<String, Integer> __nameMap = __typeMap.entrySet().stream().collect(Collectors.toMap(
@@ -142,7 +145,20 @@ public class StunAttribute {
         StunAttribute s = new StunAttribute("USE-CANDIDATE");
         attrs.add(s);
     }
-
+    static void addDTLSData(ArrayList<StunAttribute> attrs,byte [] data) {
+        StunAttribute d = new StunAttribute("DTLS-IN-STUN-DATA");
+        d.setBytes(data);
+        attrs.add(d);
+    }
+    static void addDTLSAck(ArrayList<StunAttribute> attrs,int [] crcs) {
+        StunAttribute a = new StunAttribute("DTLS-IN-STUN-ACK");
+        ByteBuffer b = ByteBuffer.allocate(crcs.length*4);
+        for (int c:crcs){
+            b.putInt(c);
+        }
+        a.setBytes(b.array());
+        attrs.add(a);
+    }
     private final Integer aType;
     private int aLen;
     private ByteBuffer aVal;
@@ -304,7 +320,7 @@ public class StunAttribute {
         }
     }
 
-    byte[] getBytes() {
+    public byte[] getBytes() {
         byte[] ret = new byte[aLen];
         int i = 0;
         while (i < aLen) {
@@ -314,7 +330,7 @@ public class StunAttribute {
         return ret;
     }
 
-    void setBytes(byte[] v) {
+    public void setBytes(byte[] v) {
         aLen = v.length;
         aVal = ByteBuffer.allocate(aLen);
         aVal.put(v);
