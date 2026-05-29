@@ -6,6 +6,7 @@
 package com.ipseorama.slice;
 
 import com.ipseorama.slice.ORTC.EventHandler;
+import com.ipseorama.slice.ORTC.RTCDtlsPacket;
 import com.ipseorama.slice.ORTC.RTCIceCandidatePair;
 import com.ipseorama.slice.ORTC.RTCIceTransport;
 import com.ipseorama.slice.ORTC.RTCLocalIceCandidate;
@@ -60,6 +61,8 @@ public class SingleThreadNioIceEngine implements IceEngine {
     private Long selectedAt = null;
     static int sliceid = 0;
     private boolean doSped;
+    int flightSum;
+    byte[] flight;
     private final ArrayList<Integer> spedAckList = new ArrayList();
     private final ArrayList<byte[]> outboundDTLS = new ArrayList();
 
@@ -492,25 +495,79 @@ The attribute can be empty, i.e. the length of the list of uint32 values can be 
             for (int i = 0; i < len; i++) {
                 long crc = crcs.getInt();
                 Log.debug("far saw sped DTLS " + crc);
-                synchronized (outboundDTLS) {
-                    this.outboundDTLS.removeIf((bo) -> {
-                        int lcrc = crcOf(bo);
-                        boolean res = lcrc == crc;
-                        Log.verb("sped DTLS checking ack against " + lcrc + " remove ->" + res);
-                        return res;
-                    });
+                if (crc == flightSum) {
+                    flightSum = 0;
+                    flight = null;
+                    Log.debug("sped acked flight " + crc);
+                } else {
+                    Log.error("Sped acking wrong flight " + flightSum);
                 }
             }
         }
     }
 
-    // how to do flights?
-    
+    byte[] getFlight() {
+        if (flight == null) {
+            int cap = 1250;
+            Log.verb("sped DTLS outbound queue of " + outboundDTLS.size());
+            boolean willsend = outboundDTLS.stream().anyMatch((o) -> RTCDtlsPacket.isEndOfFlight(true, o));
+            if (!willsend) {
+                Log.verb("sped DTLS empty message because no end of flights in outbound queue");
+            } else {
+                ByteBuffer fbb = ByteBuffer.allocate(cap);
+                synchronized (outboundDTLS) {
+                    int last = 0;
+                    int tot = 0;
+                    for (int i = 0; i < outboundDTLS.size(); i++) {
+                        byte[] o = outboundDTLS.get(i);
+                        int l = o.length;
+                        if ((l + tot) < cap) {
+                            last = i;
+                            fbb.put(tot, o);
+                            tot += l;
+                            if (RTCDtlsPacket.isEndOfFlight(true, o)) {
+                                Log.verb("sped DTLS last in flight " + i + " tot=" + tot + " l=" + l);
+                                break;
+                            }
+                        } else {
+                            Log.verb("sped DTLS next message to big for flight " + i + " tot=" + tot + " l=" + l);
+                            break;
+                        }
+                    }
+                    for (int i = 0; i <= last; i++) {
+                        outboundDTLS.remove(0);
+                        Log.debug("added to sped DTLS outbound flight " + i);
+                    }
+                    flight = new byte[tot];
+                    fbb.get(0, flight);
+                    flightSum = crcOf(flight);
+
+                }
+                Log.debug("DTLS flight of " + flight.length + " crc is " + flightSum);
+            }
+        } else {
+            Log.verb("sped DTLS use existing flight");
+        }
+        return flight;
+    }
+
+    /*
+    - HelloRequest: 0x00
+- ClientHello: 0x01
+- ServerHello: 0x02
+- Certificate: 0x0B
+- ServerKeyExchange: 0x0C
+- CertificateRequest: 0x0D
+- ServerHelloDone: 0x0E
+- CertificateVerify: 0x0F
+- ClientKeyExchange: 0x10
+- Finished: 0x14
+     */
     private void outboundSped(StunPacket sp) {
         if ((sp instanceof StunBindingRequest) || (sp instanceof StunBindingResponse)) {
-            byte[] pk;
-            synchronized (outboundDTLS) {
-                pk = outboundDTLS.isEmpty() ? new byte[0] : outboundDTLS.getFirst();
+            byte[] pk = getFlight();
+            if (pk == null) {
+                pk = new byte[0];
             }
             ByteBuffer acks;
             synchronized (spedAckList) {
@@ -529,7 +586,7 @@ The attribute can be empty, i.e. the length of the list of uint32 values can be 
     public void addOutBoundDTLS(byte[] buf, int off, int len) {
         byte[] b = new byte[len];
         System.arraycopy(buf, off, b, 0, len);
-        Log.debug("sped DTLS enqueued " + crcOf(b));
+        Log.debug("sped DTLS enqueued to outbound end of flight = " +RTCDtlsPacket.isEndOfFlight(true, b));
         synchronized (outboundDTLS) {
             outboundDTLS.add(b);
         }
